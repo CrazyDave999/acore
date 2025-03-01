@@ -1,0 +1,15 @@
+cargo-features = ["edition2024"]
+
+[package]
+name = "kernel"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+bitflags = "1.2.1"
+log = "0.4"
+
+[profile.release]
+debug = true
