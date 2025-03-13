@@ -20,7 +20,7 @@ pub fn print(args: fmt::Arguments) {
 /// print string macro
 macro_rules! print {
     ($fmt: literal $(, $($arg: tt)+)?) => {
-        $crate::console::print(format_args!($fmt $(, $($arg)+)?));
+        $crate::console::stdout::print(format_args!($fmt $(, $($arg)+)?));
     }
 }
 
@@ -28,6 +28,6 @@ macro_rules! print {
 /// println string macro
 macro_rules! println {
     ($fmt: literal $(, $($arg: tt)+)?) => {
-        $crate::console::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?));
+        $crate::console::stdout::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?));
     }
 }

@@ -11,7 +11,7 @@ pub fn alloc_error_handler(layout: core::alloc::Layout) -> ! {
 
 static mut HEAP_SPACE: [u8; KERNEL_HEAP_SIZE] = [0; KERNEL_HEAP_SIZE];
 
-pub fn init_heap() {
+pub fn init() {
     unsafe {
         HEAP.borrow_mut().init(HEAP_SPACE.as_ptr() as usize, KERNEL_HEAP_SIZE);
     }

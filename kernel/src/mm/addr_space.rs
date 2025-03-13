@@ -9,13 +9,13 @@ pub struct AddrSpace {
     /// responsible for modifying and reading page table's memory area
     page_table: PageTable,
     ///
-    sections: Vec<Section>,
+    sections: Vec<Segment>,
     /// hold all frame guards during AddrSpace's lifetime
     frame_guards: BTreeMap<VirtPageNum, FrameGuard>,
 }
 
 /// A continuous memory region, with same flags
-pub struct Section {
+pub struct Segment {
     start_vpn: VirtPageNum,
     end_vpn: VirtPageNum,
 }
