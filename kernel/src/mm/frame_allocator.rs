@@ -47,6 +47,7 @@ impl FrameAllocator for StackFrameAllocator {
         if let Some(ppn) = self.recycled.pop() {
             Some(ppn.into())
         } else if self.cap == self.max_cap {
+            // todo: all frames are used, consider evicting some frames to disk
             None
         } else {
             let ppn = self.cap;

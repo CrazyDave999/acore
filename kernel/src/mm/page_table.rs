@@ -44,21 +44,22 @@ impl PageTableEntry {
     pub fn is_valid(&self) -> bool {
         (self.flags() & PTEFlags::V) != PTEFlags::empty()
     }
-    pub fn readable(&self) -> bool {
+    pub fn is_readable(&self) -> bool {
         (self.flags() & PTEFlags::R) != PTEFlags::empty()
     }
 
-    pub fn writable(&self) -> bool {
+    pub fn is_writable(&self) -> bool {
         (self.flags() & PTEFlags::W) != PTEFlags::empty()
     }
 
-    pub fn executable(&self) -> bool {
+    pub fn is_executable(&self) -> bool {
         (self.flags() & PTEFlags::X) != PTEFlags::empty()
     }
 }
 
 pub struct PageTable {
     root_ppn: PhysPageNum,
+    /// The frame guards of all frames used by this page table
     frame_guards: Vec<FrameGuard>,
 }
 

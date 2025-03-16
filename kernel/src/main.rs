@@ -6,7 +6,7 @@
 extern crate bitflags;
 extern crate alloc;
 
-use core::arch::asm;
+use core::arch::{asm, global_asm};
 use log::*;
 use riscv::register::{mstatus, mepc, satp, pmpaddr0, pmpcfg0};
 
@@ -18,10 +18,12 @@ mod syscall;
 mod timer;
 mod trap;
 mod proc;
+mod batch;
 
 use console::mmio::UART;
 
-core::arch::global_asm!(include_str!("entry.asm"));
+global_asm!(include_str!("entry.asm"));
+global_asm!(include_str!("link_app.S"));
 
 fn clear_bss() {
     extern "C" {
@@ -37,7 +39,7 @@ fn clear_bss() {
 #[no_mangle]
 unsafe fn from_m_to_s() {
     // mstatus set for privilege change, mepc set for correct jumping
-    mstatus::set_mpp(riscv::register::mstatus::MPP::Supervisor);
+    unsafe {mstatus::set_mpp(mstatus::MPP::Supervisor);}
     mepc::write(rust_main as usize);
 
     // disable page table for the supervisor mode
@@ -48,6 +50,8 @@ unsafe fn from_m_to_s() {
 
     // keep CPU's hartid in tp register
     asm!("csrr tp, mhartid");
+
+    timer::init();
 
     asm!(
         "csrw mideleg, {mideleg}", // some bits could not be set by this method
@@ -64,14 +68,14 @@ fn rust_init() {
     UART.init();
     console::logging::init();
     mm::init();
+    trap::init();
+    timer::set_next_trigger();
 }
 
 #[no_mangle]
 pub fn rust_main() -> ! {
-    rust_init();
     println!("Hello from CrazyDave's acore implementation.");
-    info!("Let's go!");
-    mm::buddy::test_vec();
-    mm::buddy::test_btree_map();
-    console::shutdown();
+    rust_init();
+    batch::init();
+    batch::run_next_app();
 }
