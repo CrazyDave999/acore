@@ -1,8 +1,9 @@
-use bitflags::*;
+use super::addr::{PhysPageNum, VirtPageNum};
 use crate::config::*;
 use crate::mm::frame_allocator::{frame_alloc, FrameGuard};
-use super::addr::{PhysPageNum, VirtPageNum};
+use alloc::vec;
 use alloc::vec::Vec;
+use bitflags::*;
 
 bitflags! {
     pub struct PTEFlags: u8 {
@@ -17,7 +18,6 @@ bitflags! {
     }
 }
 
-
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct PageTableEntry {
@@ -31,9 +31,7 @@ impl PageTableEntry {
         }
     }
     pub fn empty() -> Self {
-        PageTableEntry {
-            bits: 0,
-        }
+        PageTableEntry { bits: 0 }
     }
     pub fn ppn(&self) -> PhysPageNum {
         (self.bits >> 10 & ((1usize << PPN_WIDTH_SV39) - 1)).into()
@@ -59,56 +57,55 @@ impl PageTableEntry {
 
 pub struct PageTable {
     root_ppn: PhysPageNum,
-    /// The frame guards of all frames used by this page table
+    /// The frame guards of all frames used by this page table, not used by actual data contents
     frame_guards: Vec<FrameGuard>,
 }
 
 impl PageTable {
+    pub fn empty() -> Self {
+        let frame = frame_alloc().unwrap();
+        PageTable {
+            root_ppn: frame.ppn,
+            frame_guards: vec![frame],
+        }
+    }
     /// Create a virtual-physical mapping
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
-        let mut cur_ppn = self.root_ppn;
-        for (i, &ind) in vpn.get_indexes().iter().enumerate() {
-            let pte = &mut cur_ppn.get_pte_array()[ind];
-            if i == 2 {
-                if pte.is_valid() {
-                    panic!("[kernel] Trying to build an existed mapping! vpn: {:?}", vpn);
-                }
-                *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
-                return;
-            }
-            if !pte.is_valid() {
-                if let Some(frame) = frame_alloc() {
-                    *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
-                    self.frame_guards.push(frame);
-                } else {
-                    panic!("[kernel] Crashed! Too many frames!");
-                }
-            }
-            cur_ppn = pte.ppn();
-        }
+        let pte = self.find_mut_pte(vpn).unwrap();
+        assert!(!pte.is_valid(), "Mapping existed! vpn: {:?}", vpn);
+        *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
     }
 
     /// Remove a virtual-physical mapping
     pub fn unmap(&mut self, vpn: VirtPageNum) {
-        let mut cur_ppn = self.root_ppn;
-        for (i, &ind) in vpn.get_indexes().iter().enumerate() {
-            let pte = &mut cur_ppn.get_pte_array()[ind];
-            if i == 2 {
-                if !pte.is_valid() {
-                    panic!("[kernel] Trying to remove a non-existed mapping! vpn: {:?}", vpn);
-                }
-                *pte = PageTableEntry::empty();
-                return;
-            }
-            if !pte.is_valid() {
-                panic!("[kernel] Trying to remove a non-existed mapping! vpn: {:?}", vpn);
-            }
-            cur_ppn = pte.ppn();
-        }
+        let pte = self.find_mut_pte(vpn).unwrap();
+        assert!(pte.is_valid(), "Trying to unmap a non-existed mapping! vpn: {:?}", vpn);
+        *pte = PageTableEntry::empty();
     }
 
     /// The identifier of the page table
     pub fn token(&self) -> usize {
         self.root_ppn.0
     }
+
+    fn find_mut_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        let mut ppn = self.root_ppn;
+        let mut result: Option<&mut PageTableEntry> = None;
+        for (i, &ind) in vpn.get_indexes().iter().enumerate() {
+            let pte = &mut ppn.get_pte_array()[ind];
+            if i == 2 {
+                result = Some(pte);
+                break;
+            }
+            if !pte.is_valid() {
+                return None;
+            }
+            ppn = pte.ppn();
+        }
+        result
+    }
+    pub fn find_pte(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
+        self.find_mut_pte(vpn).map(|pte| *pte)
+    }
+
 }

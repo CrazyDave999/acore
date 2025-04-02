@@ -10,6 +10,8 @@ riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 bitflags = "1.2.1"
 log = "0.4"
+xmas-elf = "0.7.0"
+
 
 [profile.release]
 debug = true
