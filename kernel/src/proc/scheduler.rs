@@ -1,28 +1,36 @@
+use crate::proc::proc_manager::ProcessControlBlock;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
-use crate::proc::proc_manager::ProcessControlBlock;
 
 /// Information for scheduling
 pub struct ProcMeta {
-    pid: usize,
+    // pub pid: usize,
     /// If time_slice reduce to 0, then the process should give up CPU.
-    time_slice: usize,
-    pcb: Arc<ProcessControlBlock>,
+    // pub time_slice: usize,
+    pub pcb: Arc<ProcessControlBlock>,
 }
 
-
-// We first implement a naive scheduler. haha :).
+// We first implement a naive RR scheduler. haha :).
 pub struct Scheduler {
     /// The queue of ready processes.
     queue: VecDeque<ProcMeta>,
 }
 
 impl Scheduler {
+    pub fn new() -> Self {
+        Scheduler {
+            queue: VecDeque::new(),
+        }
+    }
     pub fn push(&mut self, pcb: Arc<ProcessControlBlock>) {
-        todo!()
+        self.queue.push_back(ProcMeta { pcb });
     }
 
     pub fn pop(&mut self) -> Option<Arc<ProcessControlBlock>> {
-        todo!()
+        if let Some(proc_meta) = self.queue.pop_front() {
+            Some(proc_meta.pcb)
+        } else {
+            None
+        }
     }
 }

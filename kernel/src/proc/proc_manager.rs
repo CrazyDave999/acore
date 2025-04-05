@@ -1,35 +1,14 @@
-use alloc::rc::Weak;
+
+use super::pcb::ProcessControlBlock;
+
+use crate::proc::scheduler::Scheduler;
+
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use crate::proc::pid::PIDGuard;
-use crate::proc::scheduler::Scheduler;
-use super::proc_ctx::ProcContext;
-use crate::mm::PhysPageNum;
-use crate::mm::MemoryManager;
-use super::__switch;
-
-pub enum ProcessState {
-    Ready,
-    Running,
-    Blocked,
-    // Zombie,
-}
-pub struct ProcessControlBlock {
-    pub pid: PIDGuard,
-    pub state: ProcessState,
-    pub trap_cx_ppn: PhysPageNum,
-    pub proc_ctx: ProcContext,
-    pub parent: Option<Weak<ProcessControlBlock>>,
-    pub children: Vec<Arc<ProcessControlBlock>>,
-    pub exit_code: i32,
-    pub mm: MemoryManager,
-}
-
-impl ProcessControlBlock {
-    pub fn from_elf(data: &mut[u8]) -> Self {
-        todo!()
-    }
-}
+use lazy_static::lazy_static;
+use crate::proc::proc_ctx::ProcContext;
+use crate::sync::UPSafeCell;
+use crate::trap::TrapContext;
 
 pub struct ProcessManager {
     cur: Option<Arc<ProcessControlBlock>>,
@@ -38,21 +17,37 @@ pub struct ProcessManager {
 }
 
 impl ProcessManager {
-    /// insert a new process
-    pub fn push(&mut self, pcb: Arc<ProcessControlBlock>) {
-        self.procs.push(pcb);
-    }
-    /// will only be called by the trap handler
-    pub fn switch_proc(&mut self) {
-        // get the context of current proc and the next proc, then call __switch
-        let cur_proc = Arc::clone(self.cur.as_ref().unwrap());
-        let next_proc = self.scheduler.pop().unwrap();
-        let cur_proc_ctx = &cur_proc.proc_ctx;
-        let next_proc_ctx = &next_proc.proc_ctx;
-        self.cur = Some(next_proc);
-        self.scheduler.push(cur_proc);
-        unsafe {
-            __switch(cur_proc_ctx as *const ProcContext as *mut ProcContext, next_proc_ctx as *const ProcContext);
+
+    pub fn new() -> Self {
+        ProcessManager {
+            cur: None,
+            procs: Vec::new(),
+            scheduler: Scheduler::new(),
         }
     }
+}
+
+lazy_static!{
+    pub static ref PROC_MANAGER: UPSafeCell<ProcessManager> = unsafe { UPSafeCell::new(ProcessManager::new()) };
+}
+
+/// Get current process's root_ppn of the page table
+pub fn cur_user_token() -> usize {
+    PROC_MANAGER.exclusive_access().cur.as_ref().unwrap().token()
+}
+
+/// Get current running process's pcb
+pub fn cur_proc() -> Option<Arc<ProcessControlBlock>> {
+    PROC_MANAGER.exclusive_access().cur.as_ref().map(Arc::clone)
+}
+
+/// Get mutable reference to current process's trap context
+pub fn cur_trap_ctx() -> &'static mut TrapContext {
+    cur_proc().unwrap().trap_ctx_ppn.get_mut()
+}
+
+/// Suspend current process and switch to a ready one
+pub fn switch_proc() {
+    let mut scheduler = &PROC_MANAGER.exclusive_access().scheduler;
+    scheduler.
 }

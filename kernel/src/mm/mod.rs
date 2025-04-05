@@ -4,6 +4,7 @@ mod addr;
 mod page_table;
 mod frame_allocator;
 mod mem_manager;
+mod loader;
 
 pub use addr::PhysPageNum;
 pub use mem_manager::MemoryManager;

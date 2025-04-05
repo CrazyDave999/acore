@@ -20,6 +20,10 @@ use crate::timer::set_next_trigger;
 use core::arch::{asm, global_asm};
 use riscv::register::{mtvec::TrapMode, scause::{self, Exception, Interrupt, Trap}, sie, sip, sstatus, stval, stvec};
 pub use crate::println;
+use crate::config::*;
+use crate::proc::{
+    cur_proc, cur_trap_ctx, cur_user_token
+};
 
 global_asm!(include_str!("trampoline.S"));
 
@@ -29,20 +33,32 @@ pub fn init() {
         fn __alltraps();
     }
     unsafe {
-        stvec::write(__alltraps as usize, TrapMode::Direct);
+        set_kernel_trap_entry();
         // sstatus::set_sie();
         sie::set_sext();
         sie::set_stimer();
         sie::set_ssoft();
     }
 }
+fn set_kernel_trap_entry() {
+    unsafe {
+        stvec::write(trap_from_kernel as usize, TrapMode::Direct);
+    }
+}
+fn set_user_trap_entry() {
+    unsafe {
+        stvec::write(TRAMPOLINE, TrapMode::Direct);
+    }
+}
 
 #[no_mangle]
 /// handle an interrupt, exception, or system call from user space
-pub fn trap_handler(cx: &mut TrapContext) -> &mut TrapContext {
+pub fn trap_handler() -> ! {
+    set_kernel_trap_entry();
 
     let scause = scause::read();
     let stval = stval::read();
+    let mut ctx = cur_trap_ctx();
 
     // println!("trap_handler, scauce = {:?}, stval = {:#x}", scause.cause(), stval);
     match scause.cause() {
@@ -56,13 +72,13 @@ pub fn trap_handler(cx: &mut TrapContext) -> &mut TrapContext {
             // set_next_trigger();
         }
         Trap::Exception(Exception::UserEnvCall) => {
-            cx.sepc += 4;
-            cx.x[10] = syscall(cx.x[17], [cx.x[10], cx.x[11], cx.x[12]]) as usize;
+            ctx.sepc += 4;
+            ctx.x[10] = syscall(ctx.x[17], [ctx.x[10], ctx.x[11], ctx.x[12]]) as usize;
         }
         Trap::Exception(Exception::StoreFault) | Trap::Exception(Exception::StorePageFault) => {
             println!(
                 "[kernel] PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.",
-                stval, cx.sepc
+                stval, ctx.sepc
             );
             panic!("PageFault in application");
             // exit_current_and_run_next();
@@ -79,7 +95,34 @@ pub fn trap_handler(cx: &mut TrapContext) -> &mut TrapContext {
             );
         }
     }
-    cx
+
+}
+
+#[no_mangle]
+pub fn trap_return() -> ! {
+    set_user_trap_entry();
+    let trap_ctx_ptr = TRAP_CONTEXT;
+    let user_satp = cur_user_token();
+    extern "C" {
+        fn __alltraps();
+        fn __restore();
+    }
+    let restore_va = __restore as usize - __alltraps as usize + TRAMPOLINE;
+    unsafe {
+        asm!(
+        "fence.i",
+        "jr {restore_va}",
+        restore_va = in(reg) restore_va,
+        in("a0") trap_ctx_ptr,
+        in("a1") user_satp,
+        options(noreturn)
+        );
+    }
+}
+
+#[no_mangle]
+pub fn trap_from_kernel() -> ! {
+    panic!("a trap {:?} happened in kernel mode!", scause::read().cause());
 }
 
 pub use context::TrapContext;
