@@ -18,7 +18,6 @@ mod syscall;
 mod timer;
 mod trap;
 mod proc;
-mod batch;
 
 use console::mmio::UART;
 
@@ -76,6 +75,5 @@ fn rust_init() {
 pub fn rust_main() -> ! {
     println!("Hello from CrazyDave's acore implementation.");
     rust_init();
-    batch::init();
-    batch::run_next_app();
+
 }

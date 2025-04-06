@@ -1,9 +1,12 @@
+use alloc::string::String;
 use super::addr::{PhysPageNum, VirtPageNum};
 use crate::config::*;
 use crate::mm::frame_allocator::{frame_alloc, FrameGuard};
 use alloc::vec;
 use alloc::vec::Vec;
+use core::ops::AddAssign;
 use bitflags::*;
+use crate::mm::VirtAddr;
 
 bitflags! {
     pub struct PTEFlags: u8 {
@@ -61,12 +64,29 @@ pub struct PageTable {
     frame_guards: Vec<FrameGuard>,
 }
 
+impl AddAssign<i32> for VirtPageNum {
+    fn add_assign(&mut self, rhs: i32) {
+        let mut new_vpn = self.0 as i32 + rhs;
+        if new_vpn < 0 {
+            panic!("VPN underflow! vpn: {:?}", self);
+        }
+        self.0 = new_vpn as usize;
+    }
+}
+
 impl PageTable {
     pub fn empty() -> Self {
         let frame = frame_alloc().unwrap();
         PageTable {
             root_ppn: frame.ppn,
             frame_guards: vec![frame],
+        }
+    }
+    /// Create a temporary page table, used for fetching user space data in kernel mode
+    pub fn from_token(satp: usize) -> Self {
+        Self {
+            root_ppn: (satp & ((1usize << 44) - 1)).into(),
+            frame_guards: vec![],
         }
     }
     /// Create a virtual-physical mapping
@@ -107,5 +127,31 @@ impl PageTable {
     pub fn find_pte(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
         self.find_mut_pte(vpn).map(|pte| *pte)
     }
-
+    pub fn find_ppn(&self, vpn: VirtPageNum) -> Option<PhysPageNum> {
+        self.find_pte(vpn).map(|pte| pte.ppn())
+    }
+    /// find a str with start va
+    pub fn find_str(&self, va: VirtAddr) -> String {
+        let mut s = String::new();
+        let mut offset = va.get_page_offset();
+        let mut cur_vpn = VirtPageNum::from(va);
+        loop {
+            let data = self.find_ppn(cur_vpn).unwrap().get_bytes_array();
+            let mut terminated = false;
+            while offset < PAGE_SIZE {
+                s.push(data[offset] as char);
+                if data[offset] == 0 {
+                    terminated = true;
+                    break;
+                }
+                offset += 1;
+            }
+            if terminated {
+                break;
+            }
+            offset = 0;
+            cur_vpn += 1;
+        }
+        s
+    }
 }

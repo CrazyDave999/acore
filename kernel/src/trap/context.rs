@@ -33,7 +33,7 @@ impl TrapContext {
     ) -> Self {
         let mut sstatus = sstatus::read(); // CSR sstatus
         sstatus.set_spp(SPP::User); // previous privilege mode: user mode
-        let mut cx = Self {
+        let mut ctx = Self {
             x: [0; 32],
             sstatus,
             sepc: entry, // entry point of app
@@ -41,7 +41,7 @@ impl TrapContext {
             kernel_sp,
             trap_handler: trap_handler as usize,
         };
-        cx.set_sp(sp);
-        cx
+        ctx.set_sp(sp);
+        ctx
     }
 }

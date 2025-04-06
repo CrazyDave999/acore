@@ -7,7 +7,7 @@ pub struct PIDAllocator {
     recycled: Vec<usize>,
 }
 
-pub struct PIDGuard(usize);
+pub struct PIDGuard(pub usize);
 
 impl PIDAllocator {
     pub fn new() -> Self {

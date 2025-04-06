@@ -9,7 +9,9 @@ mod pcb;
 use switch::__switch;
 
 pub use proc_manager::{
-    cur_proc,
-    cur_user_token,
-    cur_trap_ctx,
+    get_cur_proc,
+    get_cur_user_token,
+    get_cur_trap_ctx,
+    push_proc
 };
+

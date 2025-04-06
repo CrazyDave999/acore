@@ -206,6 +206,33 @@ impl MemoryManager {
         mm.entry_point = elf.header.pt2.entry_point() as usize;
         mm
     }
+
+    /// Clone a memory manager. For fork.
+    pub fn from_existed(another_mm: &Self) -> Self {
+        let mut mm = MemoryManager::empty();
+        mm.entry_point = another_mm.entry_point;
+        mm.user_stack_top = another_mm.user_stack_top;
+        mm.map_trampoline();
+        for area in another_mm.areas.iter() {
+            mm.push_area(
+                area.start_vpn.into(),
+                area.end_vpn.into(),
+                area.map_type,
+                area.map_perm,
+                None,
+            );
+            for vpn in area.start_vpn..area.end_vpn {
+                let src_data = another_mm
+                    .page_table
+                    .find_ppn(vpn)
+                    .unwrap()
+                    .get_bytes_array();
+                let dst_data = mm.page_table.find_ppn(vpn).unwrap().get_bytes_array();
+                dst_data.copy_from_slice(src_data);
+            }
+        }
+        mm
+    }
     fn get_area_frame_guards(
         &mut self,
         start_va: VirtAddr,
@@ -238,7 +265,7 @@ impl MemoryManager {
             PTEFlags::R | PTEFlags::X,
         )
     }
-    fn push_area(
+    pub fn push_area(
         &mut self,
         start_va: VirtAddr,
         end_va: VirtAddr,
@@ -291,4 +318,24 @@ impl Area {}
 lazy_static! {
     pub static ref KERNEL_MM: Arc<UPSafeCell<MemoryManager>> =
         Arc::new(unsafe { UPSafeCell::new(MemoryManager::new_kernel()) });
+}
+
+/// Get the kernel stack position of given pid
+pub fn get_kernel_stack_info(pid: usize) -> (usize, usize) {
+    let top = TRAMPOLINE - pid * (KERNEL_STACK_SIZE + PAGE_SIZE);
+    let bottom = top - KERNEL_STACK_SIZE;
+    (bottom, top)
+}
+
+/// Create framed kernel stack space for given pid
+pub fn init_kernel_stack(pid: usize) -> (usize, usize) {
+    let (bottom, top) = get_kernel_stack_info(pid);
+    KERNEL_MM.exclusive_access().push_area(
+        bottom.into(),
+        top.into(),
+        MapType::Framed,
+        MapPerm::R | MapPerm::W,
+        None,
+    );
+    (bottom, top)
 }

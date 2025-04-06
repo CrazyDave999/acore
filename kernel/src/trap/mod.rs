@@ -22,7 +22,7 @@ use riscv::register::{mtvec::TrapMode, scause::{self, Exception, Interrupt, Trap
 pub use crate::println;
 use crate::config::*;
 use crate::proc::{
-    cur_proc, cur_trap_ctx, cur_user_token
+    get_cur_proc, get_cur_trap_ctx, get_cur_user_token
 };
 
 global_asm!(include_str!("trampoline.S"));
@@ -58,7 +58,7 @@ pub fn trap_handler() -> ! {
 
     let scause = scause::read();
     let stval = stval::read();
-    let mut ctx = cur_trap_ctx();
+    let mut ctx = get_cur_trap_ctx();
 
     // println!("trap_handler, scauce = {:?}, stval = {:#x}", scause.cause(), stval);
     match scause.cause() {
@@ -102,7 +102,7 @@ pub fn trap_handler() -> ! {
 pub fn trap_return() -> ! {
     set_user_trap_entry();
     let trap_ctx_ptr = TRAP_CONTEXT;
-    let user_satp = cur_user_token();
+    let user_satp = get_cur_user_token();
     extern "C" {
         fn __alltraps();
         fn __restore();
