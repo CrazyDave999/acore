@@ -1,7 +1,7 @@
 use super::buddy_list::BuddyList;
 use core::alloc::{GlobalAlloc, Layout};
-use core::cmp::{max, min};
 use core::cell::RefCell;
+use core::cmp::{max, min};
 use core::mem::size_of;
 use core::ops::Deref;
 // use crate::config::*;

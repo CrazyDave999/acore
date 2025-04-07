@@ -6,12 +6,14 @@ mod scheduler;
 mod switch;
 mod pcb;
 
-use switch::__switch;
-
 pub use proc_manager::{
     get_cur_proc,
     get_cur_user_token,
     get_cur_trap_ctx,
-    push_proc
+    push_proc,
+    launch,
+};
+pub use pcb::{
+    INIT_PCB,
 };
 

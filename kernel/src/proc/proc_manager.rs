@@ -7,7 +7,6 @@ use crate::proc::switch::__switch;
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
-use alloc::vec::Vec;
 use lazy_static::lazy_static;
 
 pub struct ProcessManager {
@@ -23,10 +22,6 @@ impl ProcessManager {
             // procs: Vec::new(),
             scheduler: Scheduler::new(),
         }
-    }
-
-    pub fn launch(&mut self, proc: Arc<ProcessControlBlock>) {
-        self.cur = Some(proc);
     }
 }
 
@@ -60,22 +55,36 @@ pub fn get_cur_trap_ctx() -> &'static mut TrapContext {
 }
 
 /// Suspend current process and switch to a ready one
-pub fn switch_proc() {
-    let mut scheduler = &PROC_MANAGER.exclusive_access().scheduler;
+pub fn switch_proc() -> ! {
+    let scheduler = &mut PROC_MANAGER.exclusive_access().scheduler;
     if let Some(next_proc) = scheduler.pop() {
         let cur_proc = get_cur_proc().unwrap();
         next_proc.exclusive_access().state = ProcessState::Running;
         cur_proc.exclusive_access().state = ProcessState::Ready;
-        let next_trap_ctx: *mut ProcContext = next_proc.exclusive_access().trap_ctx_ppn.get_mut();
+        let next_trap_ctx: *const ProcContext = next_proc.exclusive_access().trap_ctx_ppn.get_mut();
         let cur_trap_ctx: *mut ProcContext = cur_proc.exclusive_access().trap_ctx_ppn.get_mut();
         scheduler.push(cur_proc);
         unsafe {
-            __switch(cur_trap_ctx, next_trap_ctx);
+            __switch(cur_trap_ctx, next_trap_ctx)
         }
     }
+    panic!("No ready process to switch to!");
 }
 
 /// Push a newly created process to the scheduler's ready queue.
 pub fn push_proc(proc: Arc<ProcessControlBlock>) {
     &PROC_MANAGER.exclusive_access().scheduler.push(proc);
+}
+
+pub fn launch(proc: Arc<ProcessControlBlock>) -> ! {
+    let mut inner = PROC_MANAGER.exclusive_access();
+    inner.cur = Some(proc);
+    inner.cur.as_ref().unwrap().set_state(ProcessState::Running);
+    drop(inner);
+    let cur_proc = get_cur_proc().unwrap();
+    let unused_proc_ctx = &mut ProcContext::empty() as *mut ProcContext;
+    let cur_proc_ctx: *const ProcContext = cur_proc.exclusive_access().trap_ctx_ppn.get_mut();
+    unsafe {
+        __switch(unused_proc_ctx, cur_proc_ctx);
+    }
 }

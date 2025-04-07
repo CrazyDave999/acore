@@ -1,8 +1,6 @@
 use core::arch::global_asm;
-use core::ptr::addr_of_mut;
 use riscv::register::{mie, mscratch, mstatus, mtvec};
 use crate::config::*;
-use crate::println;
 
 global_asm!(include_str!("mtime_trap.S"));
 

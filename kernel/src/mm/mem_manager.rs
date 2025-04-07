@@ -4,6 +4,7 @@ use crate::mm::addr::{VirtAddr, VirtPageNum};
 use crate::mm::frame_allocator::{frame_alloc, FrameGuard};
 use crate::mm::PhysPageNum;
 use crate::sync::UPSafeCell;
+use crate::utils::NumRange;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::bitflags;
@@ -184,7 +185,7 @@ impl MemoryManager {
             }
         }
         // align end_of_elf_data
-        let user_stack_bottom: usize = max_end_va.ceil().into() + PAGE_SIZE;
+        let user_stack_bottom: usize = max_end_va.ceil().0 + PAGE_SIZE;
         let user_stack_top: usize = user_stack_bottom + USER_STACK_SIZE;
         // user stack
         mm.push_area(
@@ -221,7 +222,7 @@ impl MemoryManager {
                 area.map_perm,
                 None,
             );
-            for vpn in area.start_vpn..area.end_vpn {
+            for vpn in NumRange::new(area.start_vpn, area.end_vpn) {
                 let src_data = another_mm
                     .page_table
                     .find_ppn(vpn)
@@ -241,7 +242,7 @@ impl MemoryManager {
         map_perm: MapPerm,
     ) -> Vec<FrameGuard> {
         let mut frame_guards = Vec::new();
-        for vpn in start_va.into()..end_va.into() {
+        for vpn in NumRange::<VirtPageNum>::new(start_va.into(), end_va.into()) {
             let ppn: PhysPageNum;
             match map_type {
                 MapType::Identical => {

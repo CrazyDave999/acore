@@ -16,13 +16,14 @@ mod context;
 
 use crate::syscall::syscall;
 
-use crate::timer::set_next_trigger;
-use core::arch::{asm, global_asm};
-use riscv::register::{mtvec::TrapMode, scause::{self, Exception, Interrupt, Trap}, sie, sip, sstatus, stval, stvec};
-pub use crate::println;
 use crate::config::*;
-use crate::proc::{
-    get_cur_proc, get_cur_trap_ctx, get_cur_user_token
+pub use crate::println;
+use crate::proc::{get_cur_trap_ctx, get_cur_user_token};
+use core::arch::{asm, global_asm};
+use riscv::register::{
+    mtvec::TrapMode,
+    scause::{self, Exception, Interrupt, Trap},
+    sie, sip, stval, stvec,
 };
 
 global_asm!(include_str!("trampoline.S"));
@@ -58,7 +59,7 @@ pub fn trap_handler() -> ! {
 
     let scause = scause::read();
     let stval = stval::read();
-    let mut ctx = get_cur_trap_ctx();
+    let ctx = get_cur_trap_ctx();
 
     // println!("trap_handler, scauce = {:?}, stval = {:#x}", scause.cause(), stval);
     match scause.cause() {
@@ -95,7 +96,7 @@ pub fn trap_handler() -> ! {
             );
         }
     }
-
+    trap_return()
 }
 
 #[no_mangle]
@@ -116,13 +117,16 @@ pub fn trap_return() -> ! {
         in("a0") trap_ctx_ptr,
         in("a1") user_satp,
         options(noreturn)
-        );
+        )
     }
 }
 
 #[no_mangle]
 pub fn trap_from_kernel() -> ! {
-    panic!("a trap {:?} happened in kernel mode!", scause::read().cause());
+    panic!(
+        "a trap {:?} happened in kernel mode!",
+        scause::read().cause()
+    );
 }
 
 pub use context::TrapContext;

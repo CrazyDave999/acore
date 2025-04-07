@@ -1,5 +1,5 @@
 use crate::config::KERNEL_HEAP_SIZE;
-use super::buddy::Heap;
+use buddy::Heap;
 
 #[global_allocator]
 static KERNEL_HEAP: Heap = Heap::new();

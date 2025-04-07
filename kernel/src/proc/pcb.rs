@@ -4,13 +4,13 @@ use crate::mm::{init_kernel_stack, VirtAddr};
 use crate::mm::{MemoryManager, PhysPageNum};
 use crate::proc::pid::{pid_alloc, PIDGuard};
 use crate::proc::proc_ctx::ProcContext;
+use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
-use alloc::sync::Weak;
 use alloc::sync::Arc;
+use alloc::sync::Weak;
 use alloc::vec::Vec;
-use core::cell::{RefCell, RefMut};
+use core::cell::RefMut;
 use lazy_static::lazy_static;
-
 
 pub enum ProcessState {
     Ready,
@@ -20,7 +20,7 @@ pub enum ProcessState {
 }
 pub struct ProcessControlBlock {
     pub pid: PIDGuard,
-    pub inner: RefCell<ProcessControlBlockInner>,
+    pub inner: UPSafeCell<ProcessControlBlockInner>,
 }
 pub struct ProcessControlBlockInner {
     pub state: ProcessState,
@@ -63,14 +63,14 @@ impl ProcessControlBlock {
 
         ProcessControlBlock {
             pid: pid_guard,
-            inner: RefCell::new(pcb_inner),
+            inner: unsafe { UPSafeCell::new(pcb_inner) },
         }
     }
     pub fn token(&self) -> usize {
-        self.inner.borrow().mm.page_table.token()
+        self.inner.exclusive_access().mm.page_table.token()
     }
     pub fn exclusive_access(&self) -> RefMut<'_, ProcessControlBlockInner> {
-        self.inner.borrow_mut()
+        self.inner.exclusive_access()
     }
     pub fn getpid(&self) -> usize {
         self.pid.0
@@ -78,24 +78,27 @@ impl ProcessControlBlock {
     pub fn fork(self: &Arc<Self>) -> Arc<Self> {
         let mut parent_inner = self.exclusive_access();
         let mm = MemoryManager::from_existed(&parent_inner.mm);
-        let trap_ctx_ppn = mm.page_table.find_ppn(
-            VirtAddr::from(TRAP_CONTEXT).into(),
-        ).unwrap();
+        let trap_ctx_ppn = mm
+            .page_table
+            .find_ppn(VirtAddr::from(TRAP_CONTEXT).into())
+            .unwrap();
         let pid_guard = pid_alloc();
         let (_, kernel_stack_top) = init_kernel_stack(pid_guard.0);
-        trap_ctx_ppn.get_mut().kernel_sp = kernel_stack_top;
+        trap_ctx_ppn.get_mut::<TrapContext>().kernel_sp = kernel_stack_top;
 
         let pcb = Arc::new(ProcessControlBlock {
             pid: pid_guard,
-            inner: RefCell::new(ProcessControlBlockInner {
-                state: ProcessState::Ready,
-                trap_ctx_ppn,
-                proc_ctx: ProcContext::new(kernel_stack_top),
-                parent: Some(Arc::downgrade(self)),
-                children: Vec::new(),
-                exit_code: 0,
-                mm,
-            }),
+            inner: unsafe {
+                UPSafeCell::new(ProcessControlBlockInner {
+                    state: ProcessState::Ready,
+                    trap_ctx_ppn,
+                    proc_ctx: ProcContext::new(kernel_stack_top),
+                    parent: Some(Arc::downgrade(self)),
+                    children: Vec::new(),
+                    exit_code: 0,
+                    mm,
+                })
+            },
         });
 
         parent_inner.children.push(Arc::clone(&pcb));
@@ -103,14 +106,15 @@ impl ProcessControlBlock {
     }
     pub fn exec(&self, data: &[u8]) {
         let mm = MemoryManager::from_elf(data);
-        let trap_ctx_ppn = mm.page_table.find_ppn(
-            VirtAddr::from(TRAP_CONTEXT).into(),
-        ).unwrap();
+        let trap_ctx_ppn = mm
+            .page_table
+            .find_ppn(VirtAddr::from(TRAP_CONTEXT).into())
+            .unwrap();
         let mut inner = self.exclusive_access();
         // abandon old virtual space and take new one, so just substitute
         inner.mm = mm;
         inner.trap_ctx_ppn = trap_ctx_ppn;
-        let trap_ctx:&mut TrapContext = trap_ctx_ppn.get_mut();
+        let trap_ctx: &mut TrapContext = trap_ctx_ppn.get_mut();
 
         let (_, kernel_stack_top) = get_kernel_stack_info(self.getpid());
 
@@ -122,10 +126,13 @@ impl ProcessControlBlock {
         );
     }
     pub fn is_zombie(&self) -> bool {
-        match self.inner.borrow().state {
+        match self.inner.exclusive_access().state {
             ProcessState::Zombie => true,
             _ => false,
         }
+    }
+    pub fn set_state(&self, state: ProcessState) {
+        self.inner.exclusive_access().state = state;
     }
 }
 

@@ -2,12 +2,8 @@
 /// this is intrusive linked list, so the mem space actually has two forms:
 /// 1. when it's free, it's a linked list node
 /// 2. when it's allocated, it's the memory block
-
-
-
 use core::cmp::min;
 use core::ptr::null_mut;
-
 
 #[derive(Copy, Clone)]
 pub struct BuddyList {
@@ -50,8 +46,6 @@ impl BuddyList {
         }
     }
 
-
-
     pub fn buddy(&self, x: usize) -> usize {
         x ^ (1 << self.class)
     }
@@ -77,7 +71,9 @@ impl BuddyList {
             return None;
         }
         let mut prev = cur;
-        unsafe { cur = *cur as *mut usize; }
+        unsafe {
+            cur = *cur as *mut usize;
+        }
         if cur.is_null() {
             return match self.is_buddy(prev, item) {
                 Some(mi) => {
@@ -93,18 +89,22 @@ impl BuddyList {
                         self.head = item;
                     }
                     None
-                }
-            }
+                },
+            };
         }
         while !cur.is_null() && cur < item {
             match self.is_buddy(cur, item) {
                 Some(mi) => {
-                    unsafe { *prev = *cur; }
+                    unsafe {
+                        *prev = *cur;
+                    }
                     return Some(mi);
                 }
                 _ => {
                     prev = cur;
-                    unsafe { cur = *cur as *mut usize; }
+                    unsafe {
+                        cur = *cur as *mut usize;
+                    }
                 }
             }
         }
@@ -116,9 +116,11 @@ impl BuddyList {
             }
         } else {
             // now cur > item
-            match self.is_buddy(cur,item) {
+            match self.is_buddy(cur, item) {
                 Some(mi) => {
-                    unsafe { *prev = *cur; }
+                    unsafe {
+                        *prev = *cur;
+                    }
                     Some(mi)
                 }
                 _ => {

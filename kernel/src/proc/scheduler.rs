@@ -1,4 +1,4 @@
-use crate::proc::proc_manager::ProcessControlBlock;
+use crate::proc::pcb::ProcessControlBlock;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 

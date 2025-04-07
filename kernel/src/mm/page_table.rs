@@ -66,7 +66,7 @@ pub struct PageTable {
 
 impl AddAssign<i32> for VirtPageNum {
     fn add_assign(&mut self, rhs: i32) {
-        let mut new_vpn = self.0 as i32 + rhs;
+        let new_vpn = self.0 as i32 + rhs;
         if new_vpn < 0 {
             panic!("VPN underflow! vpn: {:?}", self);
         }
