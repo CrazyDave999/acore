@@ -16,7 +16,7 @@ use crate::println;
 pub enum ProcessState {
     Ready,
     Running,
-    Blocked,
+    // Blocked,
     Zombie,
 }
 pub struct ProcessControlBlock {
@@ -34,20 +34,6 @@ pub struct ProcessControlBlockInner {
 }
 
 impl ProcessControlBlock {
-    pub fn empty() -> Self {
-        ProcessControlBlock {
-            pid: PIDGuard(0),
-            inner: unsafe { UPSafeCell::new(ProcessControlBlockInner {
-                state: ProcessState::Ready,
-                trap_ctx_ppn: PhysPageNum(0),
-                proc_ctx: ProcContext::new(0),
-                parent: None,
-                children: Vec::new(),
-                exit_code: 0,
-                mm: MemoryManager::empty(),
-            }) },
-        }
-    }
     pub fn from_elf(data: &[u8]) -> Self {
         let mm = MemoryManager::from_elf(data);
         let trap_ctx_ppn = mm

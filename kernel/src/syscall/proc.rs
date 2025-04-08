@@ -1,8 +1,6 @@
 use alloc::sync::Arc;
 use crate::mm::PageTable;
-use crate::console::shutdown;
 use crate::mm::get_app_data_by_name;
-use crate::println;
 use crate::proc::{get_cur_proc, get_cur_user_token, push_proc,switch_proc,exit_proc};
 use crate::timer::get_time;
 use crate::trap::TrapContext;

@@ -3,6 +3,7 @@ use crate::config::*;
 use crate::mm::addr::{VirtAddr, VirtPageNum};
 use crate::mm::frame_allocator::{frame_alloc, FrameGuard};
 use crate::mm::PhysPageNum;
+use crate::println;
 use crate::sync::UPSafeCell;
 use crate::utils::NumRange;
 use alloc::sync::Arc;
@@ -13,7 +14,6 @@ use core::cmp::{max, min};
 use lazy_static::lazy_static;
 use riscv::register::satp;
 use xmas_elf::program::Type;
-use crate::println;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MapType {
@@ -155,8 +155,17 @@ impl MemoryManager {
             match ph.get_type() {
                 Ok(ty) => {
                     if ty == Type::Load {
-                        let start_va = (ph.virtual_addr() as usize).into();
-                        let end_va = ((ph.virtual_addr() + ph.mem_size()) as usize).into();
+                        let start_va = VirtAddr(ph.virtual_addr() as usize);
+                        let end_va = VirtAddr((ph.virtual_addr() + ph.mem_size()) as usize);
+                        println!(
+                            "i = {}, start_vpn = {:?}, end_vpn = {:?}, start_va = {:?}, \
+                        end_va = {:?}",
+                            i,
+                            start_va.floor(),
+                            end_va.ceil(),
+                            start_va,
+                            end_va
+                        );
                         max_end_va = max(max_end_va, end_va);
                         let mut map_perm = MapPerm::U;
                         let ph_flags = ph.flags();

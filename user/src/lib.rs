@@ -34,17 +34,7 @@ fn main() -> i32 {
     panic!("Cannot find main!");
 }
 
-fn clear_bss() {
-    extern "C" {
-        fn start_bss();
-        fn end_bss();
-    }
-    (start_bss as usize..end_bss as usize).for_each(|addr| unsafe {
-        (addr as *mut u8).write_volatile(0);
-    });
-}
 fn init() {
-    clear_bss();
     unsafe {
         USER_HEAP.borrow_mut().init(USER_HEAP_SPACE.as_ptr() as usize, USER_HEAP_SIZE);
     }
