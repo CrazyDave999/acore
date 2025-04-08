@@ -18,7 +18,7 @@ use crate::syscall::syscall;
 
 use crate::config::*;
 pub use crate::println;
-use crate::proc::{get_cur_trap_ctx, get_cur_user_token};
+use crate::proc::{get_cur_trap_ctx, get_cur_user_token, switch_proc};
 use core::arch::{asm, global_asm};
 use riscv::register::{
     mtvec::TrapMode,
@@ -61,7 +61,7 @@ pub fn trap_handler() -> ! {
     let stval = stval::read();
     let ctx = get_cur_trap_ctx();
 
-    // println!("trap_handler, scauce = {:?}, stval = {:#x}", scause.cause(), stval);
+    println!("trap_handler, scauce = {:?}, stval = {:#x}", scause.cause(), stval);
     match scause.cause() {
         Trap::Interrupt(Interrupt::SupervisorSoft) => {
             // delegated by m mode, actually a machine timer interrupt
@@ -70,7 +70,8 @@ pub fn trap_handler() -> ! {
             unsafe {
                 asm! {"csrw sip, {sip}", sip = in(reg) sip ^ 2};
             }
-            // set_next_trigger();
+            set_next_trigger();
+            switch_proc();
         }
         Trap::Exception(Exception::UserEnvCall) => {
             ctx.sepc += 4;
@@ -130,3 +131,4 @@ pub fn trap_from_kernel() -> ! {
 }
 
 pub use context::TrapContext;
+use crate::timer::set_next_trigger;

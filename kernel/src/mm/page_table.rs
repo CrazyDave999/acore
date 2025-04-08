@@ -91,7 +91,7 @@ impl PageTable {
     }
     /// Create a virtual-physical mapping
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
-        let pte = self.find_mut_pte(vpn).unwrap();
+        let pte = self.find_mut_pte_create(vpn).unwrap();
         assert!(!pte.is_valid(), "Mapping existed! vpn: {:?}", vpn);
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
     }
@@ -130,11 +130,29 @@ impl PageTable {
     pub fn find_ppn(&self, vpn: VirtPageNum) -> Option<PhysPageNum> {
         self.find_pte(vpn).map(|pte| pte.ppn())
     }
+    pub fn find_mut_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        let mut ppn = self.root_ppn;
+        let mut result: Option<&mut PageTableEntry> = None;
+        for (i, &ind) in vpn.get_indexes().iter().enumerate() {
+            let pte = &mut ppn.get_pte_array()[ind];
+            if i == 2 {
+                result = Some(pte);
+                break;
+            }
+            if !pte.is_valid() {
+                let frame = frame_alloc().unwrap();
+                *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
+                self.frame_guards.push(frame);
+            }
+            ppn = pte.ppn();
+        }
+        result
+    }
     /// find a str with start va
     pub fn find_str(&self, va: VirtAddr) -> String {
         let mut s = String::new();
         let mut offset = va.get_page_offset();
-        let mut cur_vpn = VirtPageNum::from(va);
+        let mut cur_vpn = va.floor();
         loop {
             let data = self.find_ppn(cur_vpn).unwrap().get_bytes_array();
             let mut terminated = false;

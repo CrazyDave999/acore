@@ -3,24 +3,24 @@ use crate::mm::PageTable;
 use crate::console::shutdown;
 use crate::mm::get_app_data_by_name;
 use crate::println;
-use crate::proc::{get_cur_proc, get_cur_user_token, push_proc};
+use crate::proc::{get_cur_proc, get_cur_user_token, push_proc,switch_proc,exit_proc};
 use crate::timer::get_time;
-
 use crate::trap::TrapContext;
 
 pub fn sys_exit(exit_code: i32) -> ! {
-    println!("[kernel] Application exited with code {}", exit_code);
-    shutdown()
+    exit_proc(exit_code);
+    panic!("Unreachable in sys_exit!");
 }
 
 pub fn sys_yield() -> isize {
+    switch_proc();
     0
 }
 
 pub fn sys_get_time() -> isize {
     get_time() as isize
 }
-pub fn sys_get_pid() -> isize {
+pub fn sys_getpid() -> isize {
     get_cur_proc().unwrap().pid.0 as isize
 }
 pub fn sys_fork() -> isize {

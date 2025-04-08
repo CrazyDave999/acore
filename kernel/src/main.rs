@@ -20,6 +20,7 @@ mod proc;
 mod utils;
 
 use console::mmio::UART;
+use crate::console::stdout::print;
 
 global_asm!(include_str!("entry.asm"));
 global_asm!(include_str!("link_app.S"));
@@ -76,5 +77,8 @@ pub fn rust_main() -> ! {
     println!("Hello from CrazyDave's acore implementation.");
     rust_init();
     mm::list_apps();
-    proc::launch(proc::INIT_PCB.clone());
+    println!("list apps done.");
+    let init=proc::INIT_PCB.clone();
+    println!("init proc: {:?}", init.getpid());
+    proc::launch(init);
 }

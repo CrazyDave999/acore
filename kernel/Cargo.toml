@@ -15,4 +15,4 @@ buddy = { path = "../buddy" }
 
 
 [profile.release]
-debug = true
+debug = 2

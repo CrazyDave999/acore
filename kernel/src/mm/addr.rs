@@ -5,7 +5,7 @@ use crate::utils::StepByOne;
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct PhysAddr(pub usize);
 
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct VirtAddr(pub usize);
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -108,6 +108,7 @@ impl VirtAddr {
     pub fn get_page_offset(&self) -> usize {
         self.0 & (PAGE_SIZE - 1)
     }
+    #[allow(unused)]
     ///Check page aligned
     pub fn is_aligned(&self) -> bool {
         self.get_page_offset() == 0
@@ -116,7 +117,10 @@ impl VirtAddr {
 
 impl From<VirtAddr> for VirtPageNum {
     fn from(v: VirtAddr) -> Self {
-        assert_eq!(v.get_page_offset(), 0);
+        // assert_eq!(v.get_page_offset(), 0);
+        if v.get_page_offset() != 0 {
+            panic!("VirtAddr is not aligned, virt_addr: {:?}", v);
+        }
         v.floor()
     }
 }

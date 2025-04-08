@@ -13,6 +13,7 @@ use core::cmp::{max, min};
 use lazy_static::lazy_static;
 use riscv::register::satp;
 use xmas_elf::program::Type;
+use crate::println;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MapType {
@@ -72,8 +73,8 @@ impl Area {
         frame_guards: Vec<FrameGuard>,
     ) -> Self {
         Self {
-            start_vpn: start_va.into(),
-            end_vpn: end_va.into(),
+            start_vpn: start_va.floor(),
+            end_vpn: end_va.ceil(),
             map_type,
             map_perm,
             frame_guards,
@@ -148,6 +149,7 @@ impl MemoryManager {
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "Invalid ELF magic number");
         let ph_cnt = elf_header.pt2.ph_count();
         let mut max_end_va = VirtAddr(0);
+        println!("for ph start");
         for i in 0..ph_cnt {
             let ph = elf.program_header(i).unwrap();
             match ph.get_type() {
@@ -242,7 +244,7 @@ impl MemoryManager {
         map_perm: MapPerm,
     ) -> Vec<FrameGuard> {
         let mut frame_guards = Vec::new();
-        for vpn in NumRange::<VirtPageNum>::new(start_va.into(), end_va.into()) {
+        for vpn in NumRange::<VirtPageNum>::new(start_va.floor(), end_va.ceil()) {
             let ppn: PhysPageNum;
             match map_type {
                 MapType::Identical => {
@@ -291,26 +293,30 @@ impl MemoryManager {
     }
     /// copy data to the specified virtual address
     pub fn write(&self, start_va: VirtAddr, data: &[u8]) {
-        // the operation is carried out page by page, hence need align
-        let mut cur_vpn = start_va.floor();
-        let mut cur_start: usize = 0;
+        let mut cur_dst_vpn = start_va.floor();
+        let mut cur_src_start: usize = 0;
+        let mut cur_dst_start = start_va.get_page_offset();
         let end: usize = data.len();
         loop {
-            let cur_end = min(cur_start + PAGE_SIZE, end);
-            let src = &data[cur_start..cur_end];
+            let cur_src_end = min(cur_src_start + PAGE_SIZE, end);
+            let src = &data[cur_src_start..cur_src_end];
             let dst = &mut self
                 .page_table
-                .find_pte(cur_vpn)
+                .find_pte(cur_dst_vpn)
                 .unwrap()
                 .ppn()
-                .get_bytes_array()[..src.len()];
+                .get_bytes_array()[cur_dst_start..cur_dst_start + src.len()];
             dst.copy_from_slice(src);
-            cur_start += PAGE_SIZE;
-            if cur_start >= end {
+            cur_src_start += PAGE_SIZE;
+            if cur_src_start >= end {
                 break;
             }
-            cur_vpn.0 += 1;
+            cur_dst_start = 0;
+            cur_dst_vpn.0 += 1;
         }
+    }
+    pub fn recycle_data_pages(&mut self) {
+        self.areas.clear();
     }
 }
 

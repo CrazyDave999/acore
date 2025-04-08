@@ -13,4 +13,6 @@ pub use page_table::PageTable;
 
 pub fn init() {
     heap::init();
+    frame_allocator::init();
+    KERNEL_MM.exclusive_access().activate();
 }
