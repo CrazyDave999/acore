@@ -1,9 +1,9 @@
 //! File and filesystem-related syscalls
 
-use alloc::vec::Vec;
-use crate::print;
 use crate::console::stdin::getchar;
+use crate::print;
 use crate::proc::get_cur_proc;
+use alloc::vec::Vec;
 
 const FD_STDIN: usize = 0;
 const FD_STDOUT: usize = 1;
@@ -12,8 +12,10 @@ const FD_STDOUT: usize = 1;
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     match fd {
         FD_STDOUT => {
-            let slice = unsafe { core::slice::from_raw_parts(buf, len) };
-            let str = core::str::from_utf8(slice).unwrap();
+            let cur_proc = get_cur_proc().unwrap();
+            let inner = cur_proc.exclusive_access();
+            let vec = inner.mm.read((buf as usize).into(), len);
+            let str = core::str::from_utf8(vec.as_slice()).unwrap();
             print!("{}", str);
             len as isize
         }
@@ -29,10 +31,9 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
             for _ in 0..len {
                 data.push(getchar());
             }
-            get_cur_proc().unwrap().exclusive_access().mm.write(
-                (buf as usize).into(),
-                &data,
-            );
+            let cur_proc = get_cur_proc().unwrap();
+            let inner = cur_proc.exclusive_access();
+            inner.mm.write((buf as usize).into(), &data);
             len as isize
         }
         _ => {

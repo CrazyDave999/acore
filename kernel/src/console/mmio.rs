@@ -2,6 +2,7 @@ use core::ptr::{read_volatile, write_volatile};
 
 use bitflags::bitflags;
 use lazy_static::lazy_static;
+use crate::config::VIRT_UART0;
 
 macro_rules! wait_for {
     ($cond:expr) => {
@@ -45,24 +46,34 @@ impl Uart {
     fn write_thr(&self, c: u8) {
         unsafe { write_volatile((self.0 + 0) as *mut u8, c) }
     }
+    #[allow(unused)]
     fn read_ier(&self) -> u8 {
         unsafe { read_volatile((self.0 + 1) as *const u8) }
     }
+
+    #[allow(unused)]
     fn write_ier(&self, c: u8) {
         unsafe { write_volatile((self.0 + 1) as *mut u8, c) }
     }
+
+    #[allow(unused)]
     fn read_iir(&self) -> u8 {
         unsafe { read_volatile((self.0 + 2) as *const u8) }
     }
+
     fn write_fcr(&self, c: u8) {
         unsafe { write_volatile((self.0 + 2) as *mut u8, c) }
     }
+
+    #[allow(unused)]
     fn read_lcr(&self) -> u8 {
         unsafe { read_volatile((self.0 + 3) as *const u8) }
     }
     fn write_lcr(&self, c: u8) {
         unsafe { write_volatile((self.0 + 3) as *mut u8, c) }
     }
+
+    #[allow(unused)]
     fn read_mcr(&self) -> u8 {
         unsafe { read_volatile((self.0 + 4) as *const u8) }
     }
@@ -73,6 +84,8 @@ impl Uart {
     fn read_lsr(&self) -> u8 {
         unsafe { read_volatile((self.0 + 5) as *const u8) }
     }
+
+    #[allow(unused)]
     fn read_msr(&self) -> u8 {
         unsafe { read_volatile((self.0 + 6) as *const u8) }
     }
@@ -102,5 +115,5 @@ impl Uart {
 }
 
 lazy_static! {
-    pub static ref UART: Uart = Uart::new(0x1000_0000);
+    pub static ref UART: Uart = Uart::new(VIRT_UART0);
 }

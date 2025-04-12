@@ -1,6 +1,6 @@
 use super::page_table::{PTEFlags, PageTable};
 use crate::config::*;
-use crate::mm::addr::{VirtAddr, VirtPageNum};
+use crate::mm::addr::{PhysAddr, VirtAddr, VirtPageNum};
 use crate::mm::frame_allocator::{frame_alloc, FrameGuard};
 use crate::mm::PhysPageNum;
 use crate::println;
@@ -59,6 +59,7 @@ pub struct MemoryManager {
 pub struct Area {
     start_vpn: VirtPageNum,
     end_vpn: VirtPageNum,
+    #[allow(unused)]
     frame_guards: Vec<FrameGuard>,
     map_type: MapType,
     map_perm: MapPerm,
@@ -95,6 +96,14 @@ impl MemoryManager {
     pub fn new_kernel() -> Self {
         let mut mm = MemoryManager::empty();
         mm.map_trampoline();
+        // println!(".text [{:#x}, {:#x})", stext as usize, etext as usize);
+        // println!(".rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
+        // println!(".data [{:#x}, {:#x})", sdata as usize, edata as usize);
+        // println!(
+        //     ".bss [{:#x}, {:#x})",
+        //     sbss_with_stack as usize, ebss as usize
+        // );
+
         mm.push_area(
             (stext as usize).into(),
             (etext as usize).into(),
@@ -130,14 +139,43 @@ impl MemoryManager {
             MapPerm::R | MapPerm::W,
             None,
         );
-        // MMIO region
+
+        // VIRT_TEST and VIRT_RTC, for shutdown
         mm.push_area(
             VIRT_TEST.into(),
-            (VIRT_TEST + 0x2000).into(), // VIRT_TEST and VIRT_RTC
+            (VIRT_TEST + 0x2000).into(),
             MapType::Identical,
             MapPerm::R | MapPerm::W,
             None,
         );
+
+        // VIRT_CLINT, for timer
+        mm.push_area(
+            VIRT_CLINT.into(),
+            (VIRT_CLINT + VIRT_CLINT_SIZE).into(),
+            MapType::Identical,
+            MapPerm::R | MapPerm::W,
+            None,
+        );
+
+        // VIRT_UART0, for uart
+        mm.push_area(
+            VIRT_UART0.into(),
+            (VIRT_UART0 + VIRT_UART0_SIZE).into(),
+            MapType::Identical,
+            MapPerm::R | MapPerm::W,
+            None,
+        );
+
+        // VIRT_UART0_VIRTIO
+        mm.push_area(
+            VIRT_UART_VIRTIO.into(),
+            (VIRT_UART_VIRTIO + VIRT_UART_VIRTIO_SIZE).into(),
+            MapType::Identical,
+            MapPerm::R | MapPerm::W,
+            None,
+        );
+
         mm
     }
     pub fn from_elf(data: &[u8]) -> Self {
@@ -149,7 +187,6 @@ impl MemoryManager {
         assert_eq!(magic, [0x7f, 0x45, 0x4c, 0x46], "Invalid ELF magic number");
         let ph_cnt = elf_header.pt2.ph_count();
         let mut max_end_va = VirtAddr(0);
-        println!("for ph start");
         for i in 0..ph_cnt {
             let ph = elf.program_header(i).unwrap();
             match ph.get_type() {
@@ -157,15 +194,15 @@ impl MemoryManager {
                     if ty == Type::Load {
                         let start_va = VirtAddr(ph.virtual_addr() as usize);
                         let end_va = VirtAddr((ph.virtual_addr() + ph.mem_size()) as usize);
-                        println!(
-                            "i = {}, start_vpn = {:?}, end_vpn = {:?}, start_va = {:?}, \
-                        end_va = {:?}",
-                            i,
-                            start_va.floor(),
-                            end_va.ceil(),
-                            start_va,
-                            end_va
-                        );
+                        // println!(
+                        //     "i = {}, start_vpn = {:?}, end_vpn = {:?}, start_va = {:?}, \
+                        // end_va = {:?}",
+                        //     i,
+                        //     start_va.floor(),
+                        //     end_va.ceil(),
+                        //     start_va,
+                        //     end_va
+                        // );
                         max_end_va = max(max_end_va, end_va);
                         let mut map_perm = MapPerm::U;
                         let ph_flags = ph.flags();
@@ -272,8 +309,8 @@ impl MemoryManager {
     }
     fn map_trampoline(&mut self) {
         self.page_table.map(
-            TRAMPOLINE.into(),
-            (strampoline as usize).into(),
+            VirtAddr::from(TRAMPOLINE).into(),
+            PhysAddr::from(strampoline as usize).into(),
             PTEFlags::R | PTEFlags::X,
         )
     }
@@ -293,13 +330,38 @@ impl MemoryManager {
         }
     }
 
+    #[no_mangle]
     pub fn activate(&self) {
+        // println!("activate satp = {:#x}", self.page_table.token());
         let satp = self.page_table.token();
         unsafe {
             satp::write(satp);
             asm!("sfence.vma");
         }
     }
+    /// get data from the specified virtual address and length
+    pub fn read(&self, start_va: VirtAddr, len: usize) -> Vec<u8> {
+        let mut cur_vpn = start_va.floor();
+        let mut cur_start = start_va.get_page_offset();
+        let mut data = Vec::new();
+        loop {
+            let cur_end = min(cur_start + len - data.len(), PAGE_SIZE);
+            let src = &self
+                .page_table
+                .find_pte(cur_vpn)
+                .unwrap()
+                .ppn()
+                .get_bytes_array()[cur_start..cur_end];
+            data.extend_from_slice(src);
+            if data.len() >= len {
+                break;
+            }
+            cur_vpn.0 += 1;
+            cur_start = 0;
+        }
+        data
+    }
+
     /// copy data to the specified virtual address
     pub fn write(&self, start_va: VirtAddr, data: &[u8]) {
         let mut cur_dst_vpn = start_va.floor();

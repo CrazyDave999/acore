@@ -1,24 +1,10 @@
-//! Trap handling functionality
-//!
-//! For rCore, we have a single trap entry point, namely `__alltraps`. At
-//! initialization in [`init()`], we set the `stvec` CSR to point to it.
-//!
-//! All traps go through `__alltraps`, which is defined in `trap.S`. The
-//! assembly language code does just enough work restore the kernel space
-//! context, ensuring that Rust code safely runs, and transfers control to
-//! [`trap_handler()`].
-//!
-//! It then calls different functionality based on what exactly the exception
-//! was. For example, timer interrupts trigger task preemption, and syscalls go
-//! to [`syscall()`].
-
 mod context;
 
 use crate::syscall::syscall;
 
 use crate::config::*;
 pub use crate::println;
-use crate::proc::{get_cur_trap_ctx, get_cur_user_token, switch_proc};
+use crate::proc::{get_cur_trap_ctx, get_cur_user_token, switch_proc, get_cur_proc};
 use core::arch::{asm, global_asm};
 use riscv::register::{
     mtvec::TrapMode,
@@ -61,11 +47,16 @@ pub fn trap_handler() -> ! {
     let stval = stval::read();
     let ctx = get_cur_trap_ctx();
 
-    println!("trap_handler, scauce = {:?}, stval = {:#x}", scause.cause(), stval);
+    println!(
+        "[kernel] trap_handler, pid = {:?} scauce = {:?}, stval = {:#x}",
+        get_cur_proc().unwrap().getpid(),
+        scause.cause(),
+        stval
+    );
     match scause.cause() {
         Trap::Interrupt(Interrupt::SupervisorSoft) => {
             // delegated by m mode, actually a machine timer interrupt
-            println!("FUCK! TIME INTERRUPT! {}", stval);
+            println!("[kernel] FUCK! TIME INTERRUPT! {}", stval);
             let sip = sip::read().bits();
             unsafe {
                 asm! {"csrw sip, {sip}", sip = in(reg) sip ^ 2};
@@ -77,12 +68,14 @@ pub fn trap_handler() -> ! {
             ctx.sepc += 4;
             ctx.x[10] = syscall(ctx.x[17], [ctx.x[10], ctx.x[11], ctx.x[12]]) as usize;
         }
-        Trap::Exception(Exception::StoreFault) | Trap::Exception(Exception::StorePageFault) => {
-            println!(
-                "[kernel] PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.",
+        Trap::Exception(Exception::StoreFault)
+        | Trap::Exception(Exception::StorePageFault)
+        | Trap::Exception(Exception::LoadFault)
+        | Trap::Exception(Exception::LoadPageFault) => {
+            panic!(
+                "[kernel] PageFault, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.",
                 stval, ctx.sepc
             );
-            panic!("PageFault in application");
             // exit_current_and_run_next();
         }
         Trap::Exception(Exception::IllegalInstruction) => {
@@ -102,9 +95,11 @@ pub fn trap_handler() -> ! {
 
 #[no_mangle]
 pub fn trap_return() -> ! {
+    println!("[kernel] trap_return");
     set_user_trap_entry();
     let trap_ctx_ptr = TRAP_CONTEXT;
     let user_satp = get_cur_user_token();
+    // println!("satp = {:#x}", user_satp);
     extern "C" {
         fn __alltraps();
         fn __restore();
@@ -130,5 +125,5 @@ pub fn trap_from_kernel() -> ! {
     );
 }
 
-pub use context::TrapContext;
 use crate::timer::set_next_trigger;
+pub use context::TrapContext;

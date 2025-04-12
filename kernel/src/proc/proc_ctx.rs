@@ -2,6 +2,7 @@ use crate::trap::trap_return;
 
 #[repr(C)]
 /// Information for switch
+#[derive(Debug)]
 pub struct ProcContext {
     pub ra: usize,
     pub sp: usize,

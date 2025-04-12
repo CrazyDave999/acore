@@ -11,18 +11,20 @@ use alloc::sync::Weak;
 use alloc::vec::Vec;
 use core::cell::RefMut;
 use lazy_static::lazy_static;
-use crate::println;
 
+#[derive(Debug)]
 pub enum ProcessState {
     Ready,
     Running,
     // Blocked,
     Zombie,
 }
+
 pub struct ProcessControlBlock {
     pub pid: PIDGuard,
     pub inner: UPSafeCell<ProcessControlBlockInner>,
 }
+
 pub struct ProcessControlBlockInner {
     pub state: ProcessState,
     pub trap_ctx_ppn: PhysPageNum,

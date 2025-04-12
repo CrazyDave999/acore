@@ -1,12 +1,14 @@
+use crate::config::*;
 use core::arch::global_asm;
 use riscv::register::{mie, mscratch, mstatus, mtvec};
-use crate::config::*;
 
 global_asm!(include_str!("mtime_trap.S"));
 
 const CLOCK_FREQ: usize = 12500000; // Hz, 一秒内mtime的增量
-const MICRO_PER_SEC:usize = 1_000_000;
-const MILLI_PER_SEC:usize = 1_000;
+#[allow(unused)]
+const MICRO_PER_SEC: usize = 1_000_000;
+#[allow(unused)]
+const MILLI_PER_SEC: usize = 1_000;
 
 const TICKS_PER_SEC: usize = 100;
 
@@ -20,10 +22,12 @@ pub fn get_time() -> usize {
     unsafe { (MTIME as *const usize).read_volatile() }
 }
 
+#[allow(unused)]
 pub fn get_time_us() -> usize {
     get_time() / (CLOCK_FREQ / MICRO_PER_SEC)
 }
 
+#[allow(unused)]
 pub fn get_time_ms() -> usize {
     get_time() / (CLOCK_FREQ / MILLI_PER_SEC)
 }
@@ -31,7 +35,6 @@ pub fn get_time_ms() -> usize {
 pub fn set_next_trigger() {
     set_timer(get_time() + CLOCK_FREQ / TICKS_PER_SEC);
 }
-
 
 #[link_section = ".bss.stack"]
 #[no_mangle]

@@ -14,6 +14,14 @@ pub const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - PAGE_SIZE_BITS;
 pub const TRAMPOLINE: usize = usize::MAX - PAGE_SIZE + 1;
 pub const TRAP_CONTEXT: usize = TRAMPOLINE - PAGE_SIZE;
 
+pub const VIRT_CLINT: usize = 0x0200_0000;
+pub const VIRT_CLINT_SIZE: usize = 0x10000;
+
+pub const VIRT_UART0: usize = 0x1000_0000;
+pub const VIRT_UART0_SIZE: usize = 0x100;
+pub const VIRT_UART_VIRTIO: usize = 0x1000_1000;
+pub const VIRT_UART_VIRTIO_SIZE: usize = 0x1000;
+
 pub const MTIME: usize = 0x0200_bff8;
 pub const MTIMECMP: usize = 0x0200_4000;
 

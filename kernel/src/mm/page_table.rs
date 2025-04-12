@@ -1,12 +1,13 @@
-use alloc::string::String;
 use super::addr::{PhysPageNum, VirtPageNum};
 use crate::config::*;
 use crate::mm::frame_allocator::{frame_alloc, FrameGuard};
+use crate::mm::VirtAddr;
+use crate::println;
+use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::ops::AddAssign;
 use bitflags::*;
-use crate::mm::VirtAddr;
+use core::ops::AddAssign;
 
 bitflags! {
     pub struct PTEFlags: u8 {
@@ -42,6 +43,9 @@ impl PageTableEntry {
     pub fn flags(&self) -> PTEFlags {
         PTEFlags::from_bits(self.bits as u8).unwrap()
     }
+    pub fn is_user(&self) -> bool {
+        (self.flags() & PTEFlags::U) != PTEFlags::empty()
+    }
     pub fn is_valid(&self) -> bool {
         (self.flags() & PTEFlags::V) != PTEFlags::empty()
     }
@@ -58,6 +62,7 @@ impl PageTableEntry {
     }
 }
 
+#[derive(Debug)]
 pub struct PageTable {
     root_ppn: PhysPageNum,
     /// The frame guards of all frames used by this page table, not used by actual data contents
@@ -91,21 +96,28 @@ impl PageTable {
     }
     /// Create a virtual-physical mapping
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
+        // println!("token: {:#x}, map: vpn: {:#x}, ppn: {:#x}", self.root_ppn.0, vpn.0, ppn.0);
         let pte = self.find_mut_pte_create(vpn).unwrap();
         assert!(!pte.is_valid(), "Mapping existed! vpn: {:?}", vpn);
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
     }
 
     /// Remove a virtual-physical mapping
+    #[allow(unused)]
     pub fn unmap(&mut self, vpn: VirtPageNum) {
         let pte = self.find_mut_pte(vpn).unwrap();
-        assert!(pte.is_valid(), "Trying to unmap a non-existed mapping! vpn: {:?}", vpn);
+        assert!(
+            pte.is_valid(),
+            "Trying to unmap a non-existed mapping! vpn: {:?}",
+            vpn
+        );
         *pte = PageTableEntry::empty();
     }
 
     /// The identifier of the page table
     pub fn token(&self) -> usize {
-        self.root_ppn.0
+        // SV39 mode is 0b1000
+        self.root_ppn.0 | (1usize << 63)
     }
 
     fn find_mut_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
@@ -125,7 +137,7 @@ impl PageTable {
         result
     }
     pub fn find_pte(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
-        self.find_mut_pte(vpn).map(|pte| *pte)
+        self.find_mut_pte(vpn).map(|pte| pte.clone())
     }
     pub fn find_ppn(&self, vpn: VirtPageNum) -> Option<PhysPageNum> {
         self.find_pte(vpn).map(|pte| pte.ppn())
@@ -171,5 +183,36 @@ impl PageTable {
             cur_vpn += 1;
         }
         s
+    }
+    #[allow(unused)]
+    pub fn visualize(&self) {
+        Self::visualize_dfs(self.root_ppn, 0);
+    }
+
+    #[allow(unused)]
+    pub fn visualize_dfs(ppn: PhysPageNum, dep: usize) {
+        println!("{}Page Table: {:#x}", "  ".repeat(dep), ppn.0);
+        for i in 0..512 {
+            let pte = &ppn.get_pte_array()[i];
+
+            if !pte.is_valid() {
+                continue;
+            }
+            println!(
+                "{}Entry {}, ppn: {:#x}, U: {}, X: {}, W: {}, R: {}, V: {}",
+                "  ".repeat(dep),
+                i,
+                pte.ppn().0,
+                pte.is_user(),
+                pte.is_executable(),
+                pte.is_writable(),
+                pte.is_readable(),
+                pte.is_valid()
+            );
+
+            if pte.is_valid() && dep < 2 {
+                Self::visualize_dfs(pte.ppn(), dep + 1);
+            }
+        }
     }
 }

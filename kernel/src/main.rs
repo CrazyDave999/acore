@@ -37,7 +37,7 @@ fn clear_bss() {
 }
 
 #[no_mangle]
-unsafe fn from_m_to_s() {
+fn from_m_to_s() {
     // mstatus set for privilege change, mepc set for correct jumping
     unsafe {mstatus::set_mpp(mstatus::MPP::Supervisor);}
     mepc::write(rust_main as usize);
@@ -49,36 +49,37 @@ unsafe fn from_m_to_s() {
     pmpcfg0::write(0xf);
 
     // keep CPU's hartid in tp register
-    asm!("csrr tp, mhartid");
-
+    unsafe {
+        asm!("csrr tp, mhartid");
+    }
     timer::init();
-
-    asm!(
+    unsafe {
+        asm!(
         "csrw mideleg, {mideleg}", // some bits could not be set by this method
         "csrw medeleg, {medeleg}",
         "mret",
         medeleg = in(reg) !0,
         mideleg = in(reg) !0,
         options(noreturn),
-    );
+        );
+    }
 }
 
 fn rust_init() {
     clear_bss();
     UART.init();
     console::logging::init();
+    println!("mm init start");
     mm::init();
+    println!("mm init ok");
     trap::init();
     timer::set_next_trigger();
 }
 
 #[no_mangle]
 pub fn rust_main() -> ! {
-    println!("Hello from CrazyDave's acore implementation.");
+    println!("[kernel] Hello from CrazyDave's acore implementation.");
     rust_init();
     mm::list_apps();
-    println!("list apps done.");
-    let init=proc::INIT_PCB.clone();
-    println!("init proc: {:?}", init.getpid());
-    proc::launch(init);
+    proc::launch(proc::INIT_PCB.clone());
 }

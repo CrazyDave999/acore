@@ -25,7 +25,7 @@ pub fn alloc_error_handler(layout: core::alloc::Layout) -> ! {
 pub extern "C" fn _start() -> ! {
     init();
     exit(main());
-    panic!("unreachable after sys_exit!");
+    // panic!("unreachable after sys_exit!");
 }
 
 #[linkage = "weak"]

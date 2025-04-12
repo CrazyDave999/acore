@@ -5,6 +5,7 @@ use lazy_static::lazy_static;
 use crate::sync::UPSafeCell;
 use crate::println;
 
+#[derive(Debug)]
 /// RAII style manipulation of frame allocation
 pub struct FrameGuard {
     pub ppn: PhysPageNum,

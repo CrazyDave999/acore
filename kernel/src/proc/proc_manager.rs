@@ -2,19 +2,18 @@ use super::pcb::{ProcessControlBlock, ProcessState};
 
 use crate::proc::scheduler::Scheduler;
 
+use crate::console::shutdown;
+use crate::println;
 use crate::proc::proc_ctx::ProcContext;
 use crate::proc::switch::__switch;
+use crate::proc::INIT_PCB;
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use lazy_static::lazy_static;
-use crate::console::shutdown;
-use crate::println;
-use crate::proc::INIT_PCB;
 
 pub struct ProcessManager {
     cur: Option<Arc<ProcessControlBlock>>,
-    // procs: Vec<Arc<ProcessControlBlock>>,
     scheduler: Scheduler,
 }
 
@@ -35,6 +34,7 @@ lazy_static! {
 
 /// Get current process's root_ppn of the page table
 pub fn get_cur_user_token() -> usize {
+    println!("[kernel] get_cur_user_token");
     PROC_MANAGER
         .exclusive_access()
         .cur
@@ -45,6 +45,7 @@ pub fn get_cur_user_token() -> usize {
 
 /// Get current running process's pcb
 pub fn get_cur_proc() -> Option<Arc<ProcessControlBlock>> {
+    println!("[kernel] get_cur_proc");
     PROC_MANAGER.exclusive_access().cur.as_ref().map(Arc::clone)
 }
 
@@ -59,12 +60,19 @@ pub fn get_cur_trap_ctx() -> &'static mut TrapContext {
 
 /// Suspend current process and switch to a ready one
 pub fn switch_proc() {
+    println!("[kernel] switch_proc");
     let mut inner = PROC_MANAGER.exclusive_access();
     if let Some(next_proc) = inner.scheduler.pop() {
-        if let Some(cur_proc) = get_cur_proc() {
+        println!("1");
+        if let Some(cur_proc) = inner.cur.clone() {
+            println!(
+                "2 cur_pid: {:?}, next_pid: {:?}",
+                cur_proc.getpid(),
+                next_proc.getpid()
+            );
             let mut next_inner = next_proc.exclusive_access();
             next_inner.state = ProcessState::Running;
-            let next_proc_ctx= &next_inner.proc_ctx as *const _;
+            let next_proc_ctx = &next_inner.proc_ctx as *const _;
 
             let mut cur_inner = cur_proc.exclusive_access();
             cur_inner.state = ProcessState::Ready;
@@ -75,23 +83,20 @@ pub fn switch_proc() {
             inner.cur = Some(next_proc);
             inner.scheduler.push(cur_proc);
             drop(inner);
-            unsafe {
-                __switch(cur_proc_ctx, next_proc_ctx)
-            }
+            unsafe { __switch(cur_proc_ctx, next_proc_ctx) }
         } else {
+            println!("3 next_pid: {:?}", next_proc.getpid());
             // no current process, just switch to next
             let mut next_inner = next_proc.exclusive_access();
             next_inner.state = ProcessState::Running;
-            let next_proc_ctx= &next_inner.proc_ctx as *const _;
+            let next_proc_ctx = &next_inner.proc_ctx as *const _;
 
             let unused_proc_ctx = &mut ProcContext::empty() as *mut _;
 
             drop(next_inner);
             inner.cur = Some(next_proc);
             drop(inner);
-            unsafe {
-                __switch(unused_proc_ctx, next_proc_ctx)
-            }
+            unsafe { __switch(unused_proc_ctx, next_proc_ctx) }
         }
     }
     // no other ready proc, do nothing
@@ -99,6 +104,7 @@ pub fn switch_proc() {
 
 /// Exit current proc and switch to a ready one. If the current proc is init, then shutdown.
 pub fn exit_proc(exit_code: i32) {
+    println!("[kernel] exit_proc");
     let cur_proc = get_cur_proc().unwrap();
     let pid = cur_proc.getpid();
     if pid == INIT_PCB.getpid() {
@@ -125,25 +131,30 @@ pub fn exit_proc(exit_code: i32) {
     // now this proc's pcb still exists
     // give out control flow and never come back
     // waiting for parent to release all its resources. e.g. page table
+    println!("[kernel] exit_proc");
     PROC_MANAGER.exclusive_access().cur = None;
     switch_proc()
 }
 
 /// Push a newly created process to the scheduler's ready queue.
 pub fn push_proc(proc: Arc<ProcessControlBlock>) {
-    &PROC_MANAGER.exclusive_access().scheduler.push(proc);
+    println!("[kernel] push_proc");
+    let mut inner = PROC_MANAGER.exclusive_access();
+    inner.scheduler.push(proc);
 }
 
 pub fn launch(proc: Arc<ProcessControlBlock>) -> ! {
-    println!("launching proc: {:?}", proc.getpid());
+    println!("[kernel] Launching proc: {:?}", proc.getpid());
     let mut inner = PROC_MANAGER.exclusive_access();
     inner.cur = Some(proc);
     inner.cur.as_ref().unwrap().set_state(ProcessState::Running);
     drop(inner);
     let cur_proc = get_cur_proc().unwrap();
-    let unused_proc_ctx = &mut ProcContext::empty() as *mut ProcContext;
-    let cur_proc_ctx: *const ProcContext = cur_proc.exclusive_access().trap_ctx_ppn.get_mut();
-    println!("going to switch");
+    let cur_proc_inner = cur_proc.exclusive_access();
+    let unused_proc_ctx = &mut ProcContext::empty() as *mut _;
+    let cur_proc_ctx = &cur_proc_inner.proc_ctx as *const _;
+    drop(cur_proc_inner);
+    drop(cur_proc);
     unsafe {
         __switch(unused_proc_ctx, cur_proc_ctx);
     }

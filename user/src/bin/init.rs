@@ -4,10 +4,11 @@
 #[macro_use]
 extern crate user_lib;
 
-use user_lib::{exec, fork, wait, yield_};
+use user_lib::{exec, fork, wait, yield_, getpid};
 
 #[no_mangle]
 fn main() -> i32 {
+    println!("[init] Hello from init. pid = {}", getpid());
     if fork() == 0 {
         exec("user_shell\0");
     } else {
