@@ -11,6 +11,7 @@ use alloc::sync::Weak;
 use alloc::vec::Vec;
 use core::cell::RefMut;
 use lazy_static::lazy_static;
+use crate::println;
 
 #[derive(Debug)]
 pub enum ProcessState {
@@ -86,6 +87,7 @@ impl ProcessControlBlock {
             .find_ppn(VirtAddr::from(TRAP_CONTEXT).into())
             .unwrap();
         let pid_guard = pid_alloc();
+        println!("new pid: {}", pid_guard.0);
         let (_, kernel_stack_top) = init_kernel_stack(pid_guard.0);
         trap_ctx_ppn.get_mut::<TrapContext>().kernel_sp = kernel_stack_top;
 
@@ -117,7 +119,7 @@ impl ProcessControlBlock {
         // abandon old virtual space and take new one, so just substitute
         inner.mm = mm;
         inner.trap_ctx_ppn = trap_ctx_ppn;
-        let trap_ctx: &mut TrapContext = trap_ctx_ppn.get_mut();
+        let trap_ctx = trap_ctx_ppn.get_mut::<TrapContext>();
 
         let (_, kernel_stack_top) = get_kernel_stack_info(self.getpid());
 

@@ -44,7 +44,7 @@ pub fn main() -> i32 {
                     }
                     line.clear();
                 }
-                print!(">> ");
+                print!("$ ");
             }
             BS | DL => {
                 if !line.is_empty() {

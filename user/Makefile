@@ -18,6 +18,10 @@ binary: elf
 
 build: binary
 
+dump: $(ELFS)
+	@mkdir -p $(TARGET_DIR)/dump
+	@$(foreach elf, $(ELFS), $(OBJDUMP) -d $(elf) > $(TARGET_DIR)/dump/$(notdir $(elf)).dump;)
+
 clean:
 	@cargo clean
 

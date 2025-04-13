@@ -14,10 +14,11 @@ const USER_HEAP_SIZE: usize = 16 * 1024;
 static mut USER_HEAP_SPACE: [u8; USER_HEAP_SIZE] = [0; USER_HEAP_SIZE];
 #[global_allocator]
 static USER_HEAP: Heap = Heap::new();
+// static HEAP: LockedHeap = LockedHeap::empty();
 
 #[alloc_error_handler]
-pub fn alloc_error_handler(layout: core::alloc::Layout) -> ! {
-    panic!("Heap allocation error: {:?}", layout)
+pub fn handle_alloc_error(layout: core::alloc::Layout) -> ! {
+    panic!("Heap allocation error, layout = {:?}", layout);
 }
 
 #[no_mangle]
@@ -73,8 +74,8 @@ pub fn wait(exit_code: &mut i32) -> isize {
             -2 => {
                 yield_();
             }
-            exit_code => {
-                return exit_code;
+            exit_pid => {
+                return exit_pid;
             }
         }
     }
@@ -85,8 +86,8 @@ pub fn waitpid(pid: usize, exit_code: &mut i32) -> isize {
             -2 => {
                 yield_();
             }
-            exit_code => {
-                return exit_code;
+            exit_pid => {
+                return exit_pid;
             }
         }
     }

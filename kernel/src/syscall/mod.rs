@@ -3,6 +3,7 @@ mod fs;
 
 use proc::*;
 use fs::*;
+use crate::println;
 
 const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;
@@ -15,6 +16,7 @@ const SYSCALL_EXEC: usize = 221;
 const SYSCALL_WAITPID: usize = 260;
 
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
+    // println!("[kernel] syscall: pid = {}, id = {}, args = {:?}", sys_getpid(), syscall_id, args);
     match syscall_id {
         SYSCALL_READ => sys_read(args[0], args[1] as *const u8, args[2]),
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),

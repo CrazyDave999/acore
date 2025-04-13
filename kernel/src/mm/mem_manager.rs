@@ -233,8 +233,9 @@ impl MemoryManager {
             }
         }
         // align end_of_elf_data
-        let user_stack_bottom: usize = max_end_va.ceil().0 + PAGE_SIZE;
+        let user_stack_bottom: usize = VirtAddr::from(max_end_va.ceil()).0 + PAGE_SIZE;
         let user_stack_top: usize = user_stack_bottom + USER_STACK_SIZE;
+        println!("[kernel] user stack, ");
         // user stack
         mm.push_area(
             user_stack_bottom.into(),
@@ -322,6 +323,12 @@ impl MemoryManager {
         map_perm: MapPerm,
         data: Option<&[u8]>,
     ) {
+        // println!(
+        //     "[kernel] push_area: token = {:#x}, start_va = {:#x}, end_va = {:#x}",
+        //     self.page_table.token(),
+        //     start_va.0,
+        //     end_va.0
+        // );
         let frame_guards = self.get_area_frame_guards(start_va, end_va, map_type, map_perm);
         let area = Area::new(start_va, end_va, map_type, map_perm, frame_guards);
         self.areas.push(area);
