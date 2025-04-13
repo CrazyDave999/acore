@@ -14,8 +14,9 @@ pub fn sys_exit(exit_code: i32) -> ! {
 }
 
 pub fn sys_yield() -> isize {
-    println!("[kernel] sys_yield: pid: {}", sys_getpid());
+    // println!("[kernel] sys_yield: pid: {}", sys_getpid());
     switch_proc();
+    // println!("[kernel] back from switch: pid: {}", sys_getpid());
     0
 }
 
@@ -51,7 +52,7 @@ pub fn sys_exec(path: *const u8) -> isize {
     }
 }
 pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
-    println!("[kernel] sys_waitpid: pid: {}", sys_getpid());
+    // println!("[kernel] sys_waitpid: pid: {}", sys_getpid());
     let cur_proc = get_cur_proc().unwrap();
 
     let mut inner = cur_proc.exclusive_access();

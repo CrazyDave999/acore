@@ -77,7 +77,7 @@ fn rust_init() {
 }
 
 #[no_mangle]
-pub fn rust_main() -> ! {
+pub fn rust_main() {
     println!("[kernel] Hello from CrazyDave's acore implementation.");
     rust_init();
     mm::list_apps();

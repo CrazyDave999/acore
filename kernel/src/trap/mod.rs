@@ -55,7 +55,7 @@ pub fn trap_handler() -> ! {
     match scause.cause() {
         Trap::Interrupt(Interrupt::SupervisorSoft) => {
             // delegated by m mode, actually a machine timer interrupt
-            println!("[kernel] FUCK! TIME INTERRUPT! {}", stval);
+            // println!("[kernel] FUCK! TIME INTERRUPT! {}", stval);
             let sip = sip::read().bits();
             unsafe {
                 asm! {"csrw sip, {sip}", sip = in(reg) sip ^ 2};

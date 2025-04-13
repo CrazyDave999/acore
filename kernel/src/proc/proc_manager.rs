@@ -60,7 +60,7 @@ pub fn get_cur_trap_ctx() -> &'static mut TrapContext {
 
 /// Suspend current process and switch to a ready one
 pub fn switch_proc() {
-    // println!("[kernel] switch_proc");
+    // println!("[kernel] switch_proc: pid: {:?}", get_cur_proc().unwrap().getpid());
     let mut inner = PROC_MANAGER.exclusive_access();
     if let Some(next_proc) = inner.scheduler.pop() {
         // println!("1");
@@ -72,19 +72,29 @@ pub fn switch_proc() {
             // );
             let mut next_inner = next_proc.exclusive_access();
             next_inner.state = ProcessState::Running;
-            let next_proc_ctx = &next_inner.proc_ctx as *const _;
+            let next_proc_ctx:*mut ProcContext = &mut next_inner.proc_ctx as *mut _;
 
             let mut cur_inner = cur_proc.exclusive_access();
             cur_inner.state = ProcessState::Ready;
-            let cur_proc_ctx = &mut cur_inner.proc_ctx as *mut _;
+            let cur_proc_ctx:*mut ProcContext = &mut cur_inner.proc_ctx as *mut _;
 
             drop(next_inner);
             drop(cur_inner);
             inner.cur = Some(next_proc);
             inner.scheduler.push(cur_proc);
             drop(inner);
-            // println!("going to switch");
-            unsafe { __switch(cur_proc_ctx, next_proc_ctx) }
+            // println!("going to switch, cur_proc_ctx_ptr: {:#x}, next_proc_ctx_ptr: {:#x}",
+            //          cur_proc_ctx
+            //     as usize,
+            //          next_proc_ctx as usize);
+            // unsafe {
+            //     println!("cur_proc_ctx: {:?}", cur_proc_ctx.as_ref().unwrap());
+            //     println!("next_proc_ctx: {:?}", next_proc_ctx.as_ref().unwrap());
+            // }
+            unsafe {
+                __switch(cur_proc_ctx, next_proc_ctx);
+            }
+            return
         } else {
             // println!("3 next_pid: {:?}", next_proc.getpid());
             // no current process, just switch to next
@@ -98,7 +108,8 @@ pub fn switch_proc() {
             inner.cur = Some(next_proc);
             drop(inner);
             // println!("going to switch");
-            unsafe { __switch(unused_proc_ctx, next_proc_ctx) }
+            unsafe { __switch(unused_proc_ctx, next_proc_ctx); }
+            return
         }
     }
     // no other ready proc, do nothing
@@ -143,7 +154,7 @@ pub fn push_proc(proc: Arc<ProcessControlBlock>) {
     inner.scheduler.push(proc);
 }
 
-pub fn launch(proc: Arc<ProcessControlBlock>) -> ! {
+pub fn launch(proc: Arc<ProcessControlBlock>){
     println!("[kernel] Launching proc: {:?}", proc.getpid());
     let mut inner = PROC_MANAGER.exclusive_access();
     inner.cur = Some(proc);

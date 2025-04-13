@@ -3,6 +3,7 @@ use core::ptr::{read_volatile, write_volatile};
 use bitflags::bitflags;
 use lazy_static::lazy_static;
 use crate::config::VIRT_UART0;
+use crate::println;
 
 macro_rules! wait_for {
     ($cond:expr) => {
@@ -31,6 +32,7 @@ bitflags! {
     }
     struct Mcr:u8 {
         const DTR = 1 << 0;
+        const AUX = 1 << 3;
     }
 }
 
@@ -96,8 +98,8 @@ impl Uart {
         self.write_thr(0x03);
         self.write_ier(0);
         self.write_lcr(Lcr::DATA_8.bits());
-        self.write_fcr(0);
-        self.write_mcr(Mcr::DTR.bits());
+        self.write_fcr(Fcr::EN.bits());
+        self.write_mcr(Mcr::DTR.bits() | Mcr::AUX.bits());
         self.write_ier(Ier::EN.bits() );
     }
 
@@ -106,6 +108,7 @@ impl Uart {
         self.write_thr(c);
     }
     pub fn recv(&self) -> Option<u8> {
+        // println!("recv?");
         if self.read_lsr() & Lsr::DA.bits() != 0 {
             Some(self.read_rbr())
         } else {
