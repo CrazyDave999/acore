@@ -3,7 +3,6 @@ use core::ptr::{read_volatile, write_volatile};
 use bitflags::bitflags;
 use lazy_static::lazy_static;
 use crate::config::VIRT_UART0;
-use crate::println;
 
 macro_rules! wait_for {
     ($cond:expr) => {

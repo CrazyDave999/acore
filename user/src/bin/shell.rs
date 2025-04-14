@@ -18,9 +18,9 @@ use user_lib::{exec, fork, waitpid};
 
 #[no_mangle]
 pub fn main() -> i32 {
-    println!("Rust user shell");
+    println!("[shell] This is CrazyDave shell. Good luck!");
     let mut line: String = String::new();
-    print!("$ ");
+    print!("^_^ $ ");
     loop {
         let c = getchar();
         match c {
@@ -44,7 +44,7 @@ pub fn main() -> i32 {
                     }
                     line.clear();
                 }
-                print!("$ ");
+                print!("^_^ $ ");
             }
             BS | DL => {
                 if !line.is_empty() {

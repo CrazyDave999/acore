@@ -1,6 +1,6 @@
 use crate::config::TRAP_CONTEXT;
 use crate::mm::{get_app_data_by_name, get_kernel_stack_info, KERNEL_MM};
-use crate::mm::{init_kernel_stack, VirtAddr};
+use crate::mm::{init_kernel_stack, release_kernel_stack, VirtAddr};
 use crate::mm::{MemoryManager, PhysPageNum};
 use crate::proc::pid::{pid_alloc, PIDGuard};
 use crate::proc::proc_ctx::ProcContext;
@@ -138,6 +138,12 @@ impl ProcessControlBlock {
     }
     pub fn set_state(&self, state: ProcessState) {
         self.inner.exclusive_access().state = state;
+    }
+}
+
+impl Drop for ProcessControlBlock {
+    fn drop(&mut self) {
+        release_kernel_stack(self.pid.0);
     }
 }
 

@@ -3,7 +3,6 @@ mod fs;
 
 use proc::*;
 use fs::*;
-use crate::println;
 
 const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;

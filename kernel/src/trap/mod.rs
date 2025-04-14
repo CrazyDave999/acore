@@ -3,8 +3,7 @@ mod context;
 use crate::syscall::syscall;
 
 use crate::config::*;
-pub use crate::println;
-use crate::proc::{get_cur_proc, get_cur_trap_ctx, get_cur_user_token, switch_proc};
+use crate::proc::{get_cur_trap_ctx, get_cur_user_token, switch_proc};
 use core::arch::{asm, global_asm};
 use riscv::register::{
     mtvec::TrapMode,

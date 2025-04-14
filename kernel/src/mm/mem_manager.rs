@@ -1,3 +1,4 @@
+use alloc::collections::{BTreeMap};
 use super::page_table::{PTEFlags, PageTable};
 use crate::config::*;
 use crate::mm::addr::{PhysAddr, VirtAddr, VirtPageNum};
@@ -10,7 +11,7 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::bitflags;
 use core::arch::asm;
-use core::cmp::{max, min};
+use core::cmp::{max, min, Ordering};
 use lazy_static::lazy_static;
 use riscv::register::satp;
 use xmas_elf::program::Type;
@@ -48,7 +49,7 @@ pub struct MemoryManager {
     /// responsible for modifying and reading page table's memory area
     pub page_table: PageTable,
 
-    pub areas: Vec<Area>,
+    pub areas: BTreeMap<usize, Area>,
 
     pub entry_point: usize,
 
@@ -87,7 +88,7 @@ impl MemoryManager {
     pub fn empty() -> Self {
         MemoryManager {
             page_table: PageTable::empty(),
-            areas: Vec::new(),
+            areas: BTreeMap::new(),
             entry_point: 0,
             user_stack_top: 0,
         }
@@ -104,35 +105,35 @@ impl MemoryManager {
         //     sbss_with_stack as usize, ebss as usize
         // );
 
-        mm.push_area(
+        mm.insert_area(
             (stext as usize).into(),
             (etext as usize).into(),
             MapType::Identical,
             MapPerm::R | MapPerm::X,
             None,
         );
-        mm.push_area(
+        mm.insert_area(
             (srodata as usize).into(),
             (erodata as usize).into(),
             MapType::Identical,
             MapPerm::R,
             None,
         );
-        mm.push_area(
+        mm.insert_area(
             (sdata as usize).into(),
             (edata as usize).into(),
             MapType::Identical,
             MapPerm::R | MapPerm::W,
             None,
         );
-        mm.push_area(
+        mm.insert_area(
             (sbss_with_stack as usize).into(),
             (ebss as usize).into(),
             MapType::Identical,
             MapPerm::R | MapPerm::W,
             None,
         );
-        mm.push_area(
+        mm.insert_area(
             (ekernel as usize).into(),
             MEMORY_END.into(),
             MapType::Identical,
@@ -141,7 +142,7 @@ impl MemoryManager {
         );
 
         // VIRT_TEST and VIRT_RTC, for shutdown
-        mm.push_area(
+        mm.insert_area(
             VIRT_TEST.into(),
             (VIRT_TEST + 0x2000).into(),
             MapType::Identical,
@@ -150,7 +151,7 @@ impl MemoryManager {
         );
 
         // VIRT_CLINT, for timer
-        mm.push_area(
+        mm.insert_area(
             VIRT_CLINT.into(),
             (VIRT_CLINT + VIRT_CLINT_SIZE).into(),
             MapType::Identical,
@@ -159,7 +160,7 @@ impl MemoryManager {
         );
 
         // VIRT_UART0, for uart
-        mm.push_area(
+        mm.insert_area(
             VIRT_UART0.into(),
             (VIRT_UART0 + VIRT_UART0_SIZE).into(),
             MapType::Identical,
@@ -168,7 +169,7 @@ impl MemoryManager {
         );
 
         // VIRT_UART0_VIRTIO
-        mm.push_area(
+        mm.insert_area(
             VIRT_UART_VIRTIO.into(),
             (VIRT_UART_VIRTIO + VIRT_UART_VIRTIO_SIZE).into(),
             MapType::Identical,
@@ -215,7 +216,7 @@ impl MemoryManager {
                         if ph_flags.is_execute() {
                             map_perm |= MapPerm::X;
                         }
-                        mm.push_area(
+                        mm.insert_area(
                             start_va,
                             end_va,
                             MapType::Framed,
@@ -237,7 +238,7 @@ impl MemoryManager {
         let user_stack_top: usize = user_stack_bottom + USER_STACK_SIZE;
         println!("[kernel] user stack, ");
         // user stack
-        mm.push_area(
+        mm.insert_area(
             user_stack_bottom.into(),
             user_stack_top.into(),
             MapType::Framed,
@@ -245,7 +246,7 @@ impl MemoryManager {
             None,
         );
         // trap context
-        mm.push_area(
+        mm.insert_area(
             TRAP_CONTEXT.into(),
             TRAMPOLINE.into(),
             MapType::Framed,
@@ -263,8 +264,8 @@ impl MemoryManager {
         mm.entry_point = another_mm.entry_point;
         mm.user_stack_top = another_mm.user_stack_top;
         mm.map_trampoline();
-        for area in another_mm.areas.iter() {
-            mm.push_area(
+        for (_, area) in another_mm.areas.iter() {
+            mm.insert_area(
                 area.start_vpn.into(),
                 area.end_vpn.into(),
                 area.map_type,
@@ -315,7 +316,7 @@ impl MemoryManager {
             PTEFlags::R | PTEFlags::X,
         )
     }
-    pub fn push_area(
+    pub fn insert_area(
         &mut self,
         start_va: VirtAddr,
         end_va: VirtAddr,
@@ -331,11 +332,24 @@ impl MemoryManager {
         // );
         let frame_guards = self.get_area_frame_guards(start_va, end_va, map_type, map_perm);
         let area = Area::new(start_va, end_va, map_type, map_perm, frame_guards);
-        self.areas.push(area);
+        self.areas.insert(start_va.0, area);
         if let Some(data) = data {
             self.write(start_va, data);
         }
     }
+    /// release virtual memory area
+    pub fn remove_area(&mut self, start_va: VirtAddr) {
+        // println!(
+        //     "[kernel] remove_area: token = {:#x}, start_va = {:#x}",
+        //     self.page_table.token(),
+        //     start_va.0
+        // );
+        let area = self.areas.remove(&start_va.0).unwrap();
+        for vpn in NumRange::new(area.start_vpn, area.end_vpn) {
+            self.page_table.unmap(vpn);
+        }
+    }
+
 
     #[no_mangle]
     pub fn activate(&self) {
@@ -415,7 +429,7 @@ pub fn get_kernel_stack_info(pid: usize) -> (usize, usize) {
 /// Create framed kernel stack space for given pid
 pub fn init_kernel_stack(pid: usize) -> (usize, usize) {
     let (bottom, top) = get_kernel_stack_info(pid);
-    KERNEL_MM.exclusive_access().push_area(
+    KERNEL_MM.exclusive_access().insert_area(
         bottom.into(),
         top.into(),
         MapType::Framed,
@@ -423,4 +437,10 @@ pub fn init_kernel_stack(pid: usize) -> (usize, usize) {
         None,
     );
     (bottom, top)
+}
+
+pub fn release_kernel_stack(pid: usize) {
+    let (bottom, _) = get_kernel_stack_info(pid);
+    KERNEL_MM.exclusive_access().remove_area(bottom.into());
+    // println!("[kernel] release_kernel_stack: pid = {}", pid);
 }

@@ -4,7 +4,6 @@ use crate::proc::{exit_proc, get_cur_proc, get_cur_user_token, push_proc, switch
 use crate::timer::get_time;
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
-use crate::console::stdout::print;
 use crate::println;
 
 pub fn sys_exit(exit_code: i32) -> ! {

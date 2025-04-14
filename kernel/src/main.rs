@@ -7,6 +7,7 @@ extern crate bitflags;
 extern crate alloc;
 
 use core::arch::{asm, global_asm};
+use log::info;
 use riscv::register::{mstatus, mepc, satp, pmpaddr0, pmpcfg0};
 
 mod config;
@@ -69,16 +70,16 @@ fn rust_init() {
     clear_bss();
     UART.init();
     console::logging::init();
-    println!("mm init start");
+    // println!("mm init start");
     mm::init();
-    println!("mm init ok");
+    // println!("mm init ok");
     trap::init();
     timer::set_next_trigger();
 }
 
 #[no_mangle]
 pub fn rust_main() {
-    println!("[kernel] Hello from CrazyDave's acore implementation.");
+    println!("[kernel] This is CrazyDave's ACore implementation.");
     rust_init();
     mm::list_apps();
     proc::launch(proc::INIT_PCB.clone());
