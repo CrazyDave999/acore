@@ -13,6 +13,7 @@ const SYSCALL_GETPID: usize = 172;
 const SYSCALL_FORK: usize = 220;
 const SYSCALL_EXEC: usize = 221;
 const SYSCALL_WAITPID: usize = 260;
+const SYSCALL_SHUTDOWN: usize = 9999;
 
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
     // println!("[kernel] syscall: pid = {}, id = {}, args = {:?}", sys_getpid(), syscall_id, args);
@@ -26,6 +27,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_FORK => sys_fork(),
         SYSCALL_EXEC => sys_exec(args[0] as *const u8),
         SYSCALL_WAITPID => sys_waitpid(args[0] as isize, args[1] as *mut i32),
+        SYSCALL_SHUTDOWN => sys_shutdown(),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

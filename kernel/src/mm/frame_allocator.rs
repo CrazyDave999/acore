@@ -2,8 +2,8 @@ use super::addr::{PhysAddr, PhysPageNum};
 use crate::config::*;
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
-use crate::sync::UPSafeCell;
 use crate::println;
+use crate::sync::UPSafeCell;
 
 #[derive(Debug)]
 /// RAII style manipulation of frame allocation
@@ -20,6 +20,7 @@ impl FrameGuard {
 
 impl Drop for FrameGuard {
     fn drop(&mut self) {
+        // println!("FrameGuard drop: ppn={:#x}", self.ppn.0);
         frame_dealloc(self.ppn);
     }
 }
@@ -82,6 +83,7 @@ pub fn init() {
         // end of kernel
         fn ekernel();
     }
+    // println!("ekernel: {:#x}, MEMORY_END: {:#x}", ekernel as usize, MEMORY_END);
     FRAME_ALLOCATOR.exclusive_access().init(
         PhysAddr::from(ekernel as usize).ceil(),
         PhysAddr::from(MEMORY_END).floor(),

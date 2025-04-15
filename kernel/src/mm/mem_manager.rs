@@ -4,14 +4,13 @@ use crate::config::*;
 use crate::mm::addr::{PhysAddr, VirtAddr, VirtPageNum};
 use crate::mm::frame_allocator::{frame_alloc, FrameGuard};
 use crate::mm::PhysPageNum;
-use crate::println;
 use crate::sync::UPSafeCell;
 use crate::utils::NumRange;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::bitflags;
 use core::arch::asm;
-use core::cmp::{max, min, Ordering};
+use core::cmp::{max, min};
 use lazy_static::lazy_static;
 use riscv::register::satp;
 use xmas_elf::program::Type;
@@ -236,7 +235,7 @@ impl MemoryManager {
         // align end_of_elf_data
         let user_stack_bottom: usize = VirtAddr::from(max_end_va.ceil()).0 + PAGE_SIZE;
         let user_stack_top: usize = user_stack_bottom + USER_STACK_SIZE;
-        println!("[kernel] user stack, ");
+        // println!("[kernel] user stack, ");
         // user stack
         mm.insert_area(
             user_stack_bottom.into(),

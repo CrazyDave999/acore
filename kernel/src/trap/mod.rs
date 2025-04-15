@@ -3,8 +3,9 @@ mod context;
 use crate::syscall::syscall;
 
 use crate::config::*;
-use crate::proc::{get_cur_trap_ctx, get_cur_user_token, switch_proc};
+use crate::proc::{exit_proc, get_cur_trap_ctx, get_cur_user_token, switch_proc};
 use core::arch::{asm, global_asm};
+use log::error;
 use riscv::register::{
     mtvec::TrapMode,
     scause::{self, Exception, Interrupt, Trap},
@@ -70,15 +71,16 @@ pub fn trap_handler() -> ! {
         | Trap::Exception(Exception::StorePageFault)
         | Trap::Exception(Exception::LoadFault)
         | Trap::Exception(Exception::LoadPageFault) => {
-            panic!(
-                "[kernel] PageFault, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.",
+            error!(
+                "[kernel] PageFault, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it\
+                .\n",
                 stval, ctx.sepc
             );
-            // exit_current_and_run_next();
+            exit_proc(-2);
         }
         Trap::Exception(Exception::IllegalInstruction) => {
-            panic!("IllegalInstruction in application");
-            // exit_current_and_run_next();
+            error!("IllegalInstruction in application\n");
+            exit_proc(-3);
         }
         _ => {
             panic!(

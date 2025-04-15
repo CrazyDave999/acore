@@ -6,15 +6,17 @@
 #[macro_use]
 pub mod console;
 mod lang_items;
-mod syscall;
+pub mod syscall;
+mod logging;
 
+use buddy_system_allocator::LockedHeap;
 use buddy::Heap;
 
 const USER_HEAP_SIZE: usize = 16 * 1024;
 static mut USER_HEAP_SPACE: [u8; USER_HEAP_SIZE] = [0; USER_HEAP_SIZE];
 #[global_allocator]
-static USER_HEAP: Heap = Heap::new();
-// static HEAP: LockedHeap = LockedHeap::empty();
+// static USER_HEAP: Heap = Heap::new();
+static HEAP: LockedHeap = LockedHeap::empty();
 
 #[alloc_error_handler]
 pub fn handle_alloc_error(layout: core::alloc::Layout) -> ! {
@@ -37,8 +39,10 @@ fn main() -> i32 {
 
 fn init() {
     unsafe {
-        USER_HEAP.borrow_mut().init(USER_HEAP_SPACE.as_ptr() as usize, USER_HEAP_SIZE);
+        // USER_HEAP.borrow_mut().init(USER_HEAP_SPACE.as_ptr() as usize, USER_HEAP_SIZE);
+        HEAP.lock().init(USER_HEAP_SPACE.as_ptr() as usize, USER_HEAP_SIZE);
     }
+    logging::init();
 }
 
 use syscall::*;

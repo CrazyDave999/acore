@@ -3,6 +3,7 @@
 use core::{arch::asm, panic::PanicInfo};
 use crate::config::*;
 use log::*;
+use crate::println;
 
 #[panic_handler]
 /// panic handler
@@ -21,6 +22,7 @@ fn panic(info: &PanicInfo) -> ! {
 }
 
 pub fn shutdown() -> ! {
+    println!("[kernel] Goodbye!");
     unsafe {
         asm!(
             "sw {0}, 0({1})",

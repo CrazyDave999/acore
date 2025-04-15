@@ -117,7 +117,7 @@ pub fn switch_proc() {
 
 /// Exit current proc and switch to a ready one. If the current proc is init, then shutdown.
 pub fn exit_proc(exit_code: i32) {
-    println!("[kernel] exit_proc");
+    // println!("[kernel] exit_proc");
     let cur_proc = get_cur_proc().unwrap();
     let pid = cur_proc.getpid();
     if pid == INIT_PCB.getpid() {

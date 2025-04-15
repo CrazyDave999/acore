@@ -25,6 +25,6 @@ pub const VIRT_UART_VIRTIO_SIZE: usize = 0x1000;
 pub const MTIME: usize = 0x0200_bff8;
 pub const MTIMECMP: usize = 0x0200_4000;
 
-pub const MEMORY_END: usize = 0x8080_0000;
+pub const MEMORY_END: usize = 0x8800_0000;
 pub const USER_STACK_SIZE: usize = 4096 * 4;
 pub const KERNEL_STACK_SIZE: usize = 4096 * 4;

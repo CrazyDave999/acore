@@ -7,8 +7,8 @@ extern crate bitflags;
 extern crate alloc;
 
 use core::arch::{asm, global_asm};
-use log::info;
 use riscv::register::{mstatus, mepc, satp, pmpaddr0, pmpcfg0};
+use log::*;
 
 mod config;
 mod console;
@@ -79,8 +79,8 @@ fn rust_init() {
 
 #[no_mangle]
 pub fn rust_main() {
-    println!("[kernel] This is CrazyDave's ACore implementation.");
     rust_init();
+    info!("[kernel] Hello from kernel. This is CrazyDave's ACore implementation.\n");
     mm::list_apps();
     proc::launch(proc::INIT_PCB.clone());
 }
