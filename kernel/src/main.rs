@@ -19,6 +19,7 @@ mod timer;
 mod trap;
 mod proc;
 mod utils;
+mod fs;
 
 use console::mmio::UART;
 use crate::console::stdout::print;

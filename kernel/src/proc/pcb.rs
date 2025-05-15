@@ -1,4 +1,7 @@
 use crate::config::TRAP_CONTEXT;
+use crate::fs::kernel_file::KernelFile;
+use crate::fs::stdio::{Stdin, Stdout};
+use crate::fs::File;
 use crate::mm::{get_app_data_by_name, get_kernel_stack_info, KERNEL_MM};
 use crate::mm::{init_kernel_stack, release_kernel_stack, VirtAddr};
 use crate::mm::{MemoryManager, PhysPageNum};
@@ -6,6 +9,7 @@ use crate::proc::pid::{pid_alloc, PIDGuard};
 use crate::proc::proc_ctx::ProcContext;
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
+use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
@@ -33,6 +37,7 @@ pub struct ProcessControlBlockInner {
     pub children: Vec<Arc<ProcessControlBlock>>,
     pub exit_code: i32,
     pub mm: MemoryManager,
+    pub fd_table: FileDescriptorTable,
 }
 
 impl ProcessControlBlock {
@@ -62,6 +67,7 @@ impl ProcessControlBlock {
             children: Vec::new(),
             exit_code: 0,
             mm,
+            fd_table: FileDescriptorTable::new(),
         };
 
         ProcessControlBlock {
@@ -101,6 +107,7 @@ impl ProcessControlBlock {
                     children: Vec::new(),
                     exit_code: 0,
                     mm,
+                    fd_table: FileDescriptorTable::new(),
                 })
             },
         });
@@ -146,8 +153,50 @@ impl Drop for ProcessControlBlock {
     }
 }
 
+impl ProcessControlBlockInner {
+    pub fn get_file(&self, fd: usize) -> Option<Arc<dyn File + Send + Sync>> {
+        self.fd_table.get_file(fd)
+    }
+}
+
 lazy_static! {
     pub static ref INIT_PCB: Arc<ProcessControlBlock> = Arc::new(ProcessControlBlock::from_elf(
         get_app_data_by_name("init").unwrap()
     ));
+}
+
+pub struct FileDescriptorTable {
+    fd_table: BTreeMap<usize, Arc<dyn File + Send + Sync>>,
+    recycled: Vec<usize>,
+}
+impl FileDescriptorTable {
+    pub fn new() -> Self {
+        FileDescriptorTable {
+            fd_table: BTreeMap::from([
+                (0, Arc::new(Stdin) as Arc<dyn File + Send + Sync>),
+                (1, Arc::new(Stdout)),
+                (2, Arc::new(Stdout)),
+            ]),
+            recycled: Vec::new(),
+        }
+    }
+    pub fn insert_kernel_file(&mut self, kernel_file: Arc<KernelFile>) -> usize {
+        let fd = if let Some(fd) = self.recycled.pop() {
+            fd
+        } else {
+            self.fd_table.len()
+        };
+        self.fd_table.insert(fd, kernel_file);
+        fd
+    }
+    pub fn dealloc_fd(&mut self, fd: usize) {
+        if let Some(_) = self.fd_table.remove(&fd) {
+            self.recycled.push(fd);
+        } else {
+            panic!("fd {} not found", fd);
+        }
+    }
+    pub fn get_file(&self, fd: usize) -> Option<Arc<dyn File + Send + Sync>> {
+        self.fd_table.get(&fd).map(|f| Arc::clone(f))
+    }
 }
