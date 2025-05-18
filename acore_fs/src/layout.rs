@@ -1,6 +1,7 @@
 use crate::block_manager::get_block_cache;
 use crate::{BlockDevice, BLOCK_SIZE};
 use alloc::sync::Arc;
+use core::cmp::min;
 
 const AFS_MAGIC_NUM: u32 = 0x114514;
 
@@ -51,6 +52,9 @@ pub struct DiskInode {
     pub next: u32,
     type_: DiskInodeType,
 }
+
+pub const DISK_INODE_SIZE: usize = core::mem::size_of::<DiskInode>();
+pub const DISK_INODE_PER_BLOCK: usize = BLOCK_SIZE / DISK_INODE_SIZE;
 
 pub enum DiskInodeType {
     File,
@@ -120,7 +124,29 @@ impl DiskInode {
         buf: &mut [u8],
         block_device: &Arc<dyn BlockDevice>,
     ) -> usize {
-        todo!()
+        let mut start = offset;
+        let end = min(offset + buf.len(), self.size as usize);
+        assert!(end > start);
+        let mut start_inner_block_id = start / BLOCK_SIZE;
+        let mut read_size = 0usize;
+        loop {
+            let mut end_current_block = min(end, (start / BLOCK_SIZE + 1) * BLOCK_SIZE);
+            let block_read_size = end_current_block - start;
+            let dst = &mut buf[read_size..read_size + block_read_size];
+            let block_id = self.get_block_id(start_inner_block_id as u32, block_device);
+            let cache = get_block_cache(block_id as usize, Arc::clone(block_device));
+            let data_block = cache.lock().as_ref::<DataBlock>(0);
+            let src = &data_block.0[start % BLOCK_SIZE..start % BLOCK_SIZE + block_read_size];
+            dst.copy_from_slice(src);
+            read_size += block_read_size;
+
+            if end_current_block == end {
+                break;
+            }
+            start = end_current_block;
+            start_inner_block_id += 1;
+        }
+        read_size
     }
 
     /// write to current inode(file)
@@ -130,7 +156,28 @@ impl DiskInode {
         buf: &[u8],
         block_device: &Arc<dyn BlockDevice>,
     ) -> usize {
-        todo!()
+        let mut start = offset;
+        let end = min(offset + buf.len(), self.size as usize);
+        assert!(end > start);
+        let mut start_inner_block_id = start / BLOCK_SIZE;
+        let mut write_size = 0usize;
+        loop {
+            let mut end_current_block = min(end, (start / BLOCK_SIZE + 1) * BLOCK_SIZE);
+            let block_write_size = end_current_block - start;
+            let block_id = self.get_block_id(start_inner_block_id as u32, block_device);
+            let cache = get_block_cache(block_id as usize, Arc::clone(block_device));
+            let data_block = cache.lock().as_mut_ref::<DataBlock>(0);
+            let dst = &mut data_block.0[start % BLOCK_SIZE..start % BLOCK_SIZE + block_write_size];
+            let src = &buf[write_size..write_size + block_write_size];
+            dst.copy_from_slice(src);
+            write_size += block_write_size;
+            if end_current_block == end {
+                break;
+            }
+            start = end_current_block;
+            start_inner_block_id += 1;
+        }
+        write_size
     }
 
     /// increase size of current inode, with given new data blocks
@@ -211,14 +258,15 @@ impl DirEntry {
     }
 }
 
-impl DirEntryBlock {
-    pub fn find_inode(&self, name: &str) -> Option<u32> {
-        self.0.iter().find_map(|entry| {
-            if entry.name() == name {
-                Some(entry.inode_id())
-            } else {
-                None
-            }
-        })
-    }
-}
+// impl DirEntryBlock {
+//     /// Find the inode inside a dir with given name
+//     pub fn find_inode(&self, name: &str) -> Option<u32> {
+//         self.0.iter().find_map(|entry| {
+//             if entry.name() == name {
+//                 Some(entry.inode_id())
+//             } else {
+//                 None
+//             }
+//         })
+//     }
+// }

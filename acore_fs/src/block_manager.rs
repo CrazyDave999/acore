@@ -17,6 +17,7 @@ impl BlockManager {
             lru_cache: LruCache::new(NonZeroUsize::try_from(BLOCK_CACHE_CAP).unwrap()),
         }
     }
+    /// Get a block cache from the block device. Load it from disk if not in cache.
     pub fn get_block_cache(
         &mut self,
         block_id: usize,
@@ -54,6 +55,7 @@ lazy_static! {
     pub static ref BLOCK_MANAGER: Mutex<BlockManager> = Mutex::new(BlockManager::new());
 }
 
+/// Get a block cache from the block device. Load it from disk if not in cache.
 pub fn get_block_cache(
     block_id: usize,
     block_device: Arc<dyn BlockDevice>,
@@ -61,6 +63,7 @@ pub fn get_block_cache(
     BLOCK_MANAGER.lock().get_block_cache(block_id, block_device)
 }
 
+/// Sync all block caches to disk
 pub fn sync_all () {
     let mut block_manager = BLOCK_MANAGER.lock();
     for (_, cache) in block_manager.lru_cache.iter_mut() {

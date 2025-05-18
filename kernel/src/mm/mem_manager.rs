@@ -1,4 +1,3 @@
-use alloc::collections::{BTreeMap};
 use super::page_table::{PTEFlags, PageTable};
 use crate::config::*;
 use crate::mm::addr::{PhysAddr, VirtAddr, VirtPageNum};
@@ -6,6 +5,8 @@ use crate::mm::frame_allocator::{frame_alloc, FrameGuard};
 use crate::mm::PhysPageNum;
 use crate::sync::UPSafeCell;
 use crate::utils::NumRange;
+use alloc::collections::BTreeMap;
+use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::bitflags;
@@ -349,7 +350,6 @@ impl MemoryManager {
         }
     }
 
-
     #[no_mangle]
     pub fn activate(&self) {
         // println!("activate satp = {:#x}", self.page_table.token());
@@ -378,6 +378,25 @@ impl MemoryManager {
             }
             cur_vpn.0 += 1;
             cur_start = 0;
+        }
+        data
+    }
+
+    pub fn read_str(&self, start_va: VirtAddr) -> String {
+        let mut data = String::new();
+        let mut va = start_va;
+        loop {
+            let c: u8 = self
+                .page_table
+                .find_pte(va.floor())
+                .unwrap()
+                .ppn()
+                .get_bytes_array()[va.get_page_offset()];
+            if c == 0 {
+                break;
+            }
+            data.push(c as char);
+            va.0 += 1;
         }
         data
     }

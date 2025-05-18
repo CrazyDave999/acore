@@ -1,7 +1,7 @@
 use super::addr::{PhysPageNum, VirtPageNum};
 use crate::config::*;
 use crate::mm::frame_allocator::{frame_alloc, FrameGuard};
-use crate::mm::VirtAddr;
+use crate::mm::{PhysAddr, VirtAddr};
 use crate::println;
 use alloc::string::String;
 use alloc::vec;
@@ -141,6 +141,13 @@ impl PageTable {
     }
     pub fn find_ppn(&self, vpn: VirtPageNum) -> Option<PhysPageNum> {
         self.find_pte(vpn).map(|pte| pte.ppn())
+    }
+    pub fn find_pa(&self, va: VirtAddr) -> Option<PhysAddr> {
+        self.find_pte(va.clone().floor()).map(|pte|{
+            let aligned_pa: PhysAddr = pte.ppn().into();
+            let offset = va.get_page_offset();
+            (aligned_pa.0 + offset).into()
+        })
     }
     pub fn find_mut_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let mut ppn = self.root_ppn;

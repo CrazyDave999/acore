@@ -12,6 +12,7 @@ bitflags = "1.2.1"
 log = "0.4"
 xmas-elf = "0.7.0"
 buddy = { path = "../buddy" }
+virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "4ee80e5" }
 acore_fs = { path = "../acore_fs" }
 
 [profile.release]

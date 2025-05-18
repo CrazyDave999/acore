@@ -180,20 +180,22 @@ impl FileDescriptorTable {
             recycled: Vec::new(),
         }
     }
-    pub fn insert_kernel_file(&mut self, kernel_file: Arc<KernelFile>) -> usize {
+    pub fn insert_kernel_file(&mut self, kernel_file: Arc<KernelFile>) -> isize {
         let fd = if let Some(fd) = self.recycled.pop() {
             fd
         } else {
             self.fd_table.len()
         };
         self.fd_table.insert(fd, kernel_file);
-        fd
+        fd as isize
     }
-    pub fn dealloc_fd(&mut self, fd: usize) {
+    pub fn dealloc_fd(&mut self, fd: usize) -> isize {
         if let Some(_) = self.fd_table.remove(&fd) {
             self.recycled.push(fd);
+            0
         } else {
-            panic!("fd {} not found", fd);
+            // panic!("fd {} not found", fd);
+            -1
         }
     }
     pub fn get_file(&self, fd: usize) -> Option<Arc<dyn File + Send + Sync>> {

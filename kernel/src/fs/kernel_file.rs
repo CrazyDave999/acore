@@ -1,7 +1,43 @@
 use alloc::sync::Arc;
-use acore_fs::Inode;
+use alloc::vec::Vec;
+use bitflags::bitflags;
+use lazy_static::lazy_static;
+use acore_fs::{DiskInodeType, Inode};
 use crate::fs::File;
 use crate::sync::UPSafeCell;
+use acore_fs::AcoreFileSystem;
+use crate::drivers::BLOCK_DEVICE;
+
+bitflags! {
+    ///Open file flags
+    pub struct OpenFlags: u32 {
+        ///Read only
+        const RDONLY = 0;
+        ///Write only
+        const WRONLY = 1 << 0;
+        ///Read & Write
+        const RDWR = 1 << 1;
+        ///Allow create
+        const CREATE = 1 << 9;
+        ///Clear file and return an empty one
+        const TRUNC = 1 << 10;
+    }
+}
+
+impl OpenFlags {
+    /// Do not check validity for simplicity
+    /// Return (readable, writable)
+    pub fn read_write(&self) -> (bool, bool) {
+        if self.is_empty() {
+            (true, false)
+        } else if self.contains(Self::WRONLY) {
+            (false, true)
+        } else {
+            (true, true)
+        }
+    }
+}
+
 
 pub struct KernelFile {
     readable: bool,
@@ -19,6 +55,25 @@ impl KernelFile {
             writable,
             inner: unsafe { UPSafeCell::new(KernelFileInner { offset: 0, inode }) },
         }
+    }
+    pub fn from_path(path: &str, flags: OpenFlags) -> Option<Arc<Self>> {
+        let mut path = path.split('/').collect::<Vec<_>>();
+        let file_name = path.pop().unwrap();
+        let mut inode = ROOT.clone();
+        for dir_entry in path {
+            inode = inode.access_dir_entry(dir_entry, DiskInodeType::Directory, false)?;
+        }
+        let (readable, writable) = flags.read_write();
+        let create = if flags.contains(OpenFlags::CREATE) {
+            true
+        } else {
+            false
+        };
+        inode = inode.access_dir_entry(file_name, DiskInodeType::File, create)?;
+        if flags.contains(OpenFlags::TRUNC) {
+            inode.clear();
+        }
+        Some(Arc::new(Self::new(readable, writable, inode)))
     }
 }
 
@@ -51,4 +106,11 @@ impl File for KernelFile {
         inner.offset = offset;
         inner.offset
     }
+}
+
+lazy_static!{
+    pub static ref ROOT: Arc<Inode> = {
+        let afs = AcoreFileSystem::open(BLOCK_DEVICE.clone());
+        AcoreFileSystem::root_inode(afs)
+    };
 }

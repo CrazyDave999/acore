@@ -20,6 +20,7 @@ mod trap;
 mod proc;
 mod utils;
 mod fs;
+mod drivers;
 
 use console::mmio::UART;
 use crate::console::stdout::print;
