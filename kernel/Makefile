@@ -1,9 +1,11 @@
 # Building
 TARGET := riscv64gc-unknown-none-elf
-MODE := debug
+MODE := release
 KERNEL_ELF := target/$(TARGET)/$(MODE)/kernel
 KERNEL_BIN := $(KERNEL_ELF).bin
 DISASM_TMP := target/$(TARGET)/$(MODE)/asm
+FS_IMG := ../user/target/$(TARGET)/$(MODE)/fs.img
+APPS := ../user/src/bin/*
 
 # Building mode argument
 ifeq ($(MODE), release)
@@ -31,6 +33,13 @@ env:
 $(KERNEL_BIN): kernel
 	@$(OBJCOPY) $(KERNEL_ELF) --strip-all -O binary $@
 
+fs-img: $(APPS)
+	@cd ../user && make build
+	@rm -f $(FS_IMG)
+	@cd ../acore_fs_fuse && cargo run --release -- -s ../user/src/bin/ -t ../user/target/riscv64gc-unknown-none-elf/release/
+
+$(APPS):
+
 kernel:
 	@cd ../user && make build
 	@cargo build $(MODE_ARG)
@@ -45,7 +54,6 @@ QEMU_ARGS := -machine virt \
 			 -bios none \
 			 -device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA)
 
-QEMU_NAME := qemu-system-riscv64
 
 run-inner: build
 	@qemu-system-riscv64 $(QEMU_ARGS)

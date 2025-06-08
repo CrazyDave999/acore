@@ -72,9 +72,9 @@ impl DiskInode {
     pub fn is_dir(&self) -> bool {
         matches!(self.type_, DiskInodeType::Directory)
     }
-    pub fn is_file(&self) -> bool {
-        matches!(self.type_, DiskInodeType::File)
-    }
+    // pub fn is_file(&self) -> bool {
+    //     matches!(self.type_, DiskInodeType::File)
+    // }
 
     /// Get block_id with given inner_id
     pub fn get_block_id(&self, inner_id: u32, block_device: &Arc<dyn BlockDevice>) -> u32 {
@@ -130,12 +130,15 @@ impl DiskInode {
         let mut start_inner_block_id = start / BLOCK_SIZE;
         let mut read_size = 0usize;
         loop {
-            let mut end_current_block = min(end, (start / BLOCK_SIZE + 1) * BLOCK_SIZE);
+            let end_current_block = min(end, (start / BLOCK_SIZE + 1) * BLOCK_SIZE);
             let block_read_size = end_current_block - start;
             let dst = &mut buf[read_size..read_size + block_read_size];
             let block_id = self.get_block_id(start_inner_block_id as u32, block_device);
+
             let cache = get_block_cache(block_id as usize, Arc::clone(block_device));
-            let data_block = cache.lock().as_ref::<DataBlock>(0);
+            let data_block_lock = cache.lock();
+            let data_block = data_block_lock.as_ref::<DataBlock>(0);
+
             let src = &data_block.0[start % BLOCK_SIZE..start % BLOCK_SIZE + block_read_size];
             dst.copy_from_slice(src);
             read_size += block_read_size;
@@ -162,11 +165,14 @@ impl DiskInode {
         let mut start_inner_block_id = start / BLOCK_SIZE;
         let mut write_size = 0usize;
         loop {
-            let mut end_current_block = min(end, (start / BLOCK_SIZE + 1) * BLOCK_SIZE);
+            let end_current_block = min(end, (start / BLOCK_SIZE + 1) * BLOCK_SIZE);
             let block_write_size = end_current_block - start;
             let block_id = self.get_block_id(start_inner_block_id as u32, block_device);
+
             let cache = get_block_cache(block_id as usize, Arc::clone(block_device));
-            let data_block = cache.lock().as_mut_ref::<DataBlock>(0);
+            let mut data_block_lock = cache.lock();
+            let data_block = data_block_lock.as_mut_ref::<DataBlock>(0);
+
             let dst = &mut data_block.0[start % BLOCK_SIZE..start % BLOCK_SIZE + block_write_size];
             let src = &buf[write_size..write_size + block_write_size];
             dst.copy_from_slice(src);
@@ -198,7 +204,7 @@ impl DiskInode {
 
     pub fn blocks_num_needed(&self, new_size: u32) -> u32 {
         assert!(new_size >= self.size);
-        Self::total_blocks(new_size) - self.total_blocks(self.size)
+        Self::total_blocks(new_size) - Self::total_blocks(self.size)
     }
 
     /// Increase size of current inode, with given new data blocks
@@ -224,50 +230,50 @@ impl DiskInode {
         }
         todo!("Handle indirect blocks");
 
-        cur_data_blocks -= INODE_DIRECT_CNT as u32;
-        new_data_blocks -= INODE_DIRECT_CNT as u32;
-
-        // alloc and fill in the indirect blocks
-        for i in 1..MAX_INDIRECT_DEGREE + 1 {
-            // degree i
-            let cur_degree_cur_data_blocks =
-                min(cur_data_blocks, INDIRECT_CNT.pow(i as u32) as u32);
-            let cur_degree_new_data_blocks =
-                min(new_data_blocks, INDIRECT_CNT.pow(i as u32) as u32);
-
-            // indices mean the position of the last block
-            let mut cur_indices = Vec::new();
-            let mut new_indices = Vec::new();
-
-            // get the current indices and new indices
-            for j in (0..i).rev() {
-                cur_indices.push(
-                    (cur_degree_cur_data_blocks % INDIRECT_CNT.pow((j + 1) as u32) as u32)
-                        / INDIRECT_CNT.pow(j as u32) as u32,
-                );
-                new_indices.push(
-                    (cur_degree_new_data_blocks % INDIRECT_CNT.pow((j + 1) as u32) as u32)
-                        / INDIRECT_CNT.pow(j as u32) as u32,
-                );
-            }
-
-            //
-            loop {
-                break;
-            }
-
-            if cur_data_blocks == 0 {
-                self.indirect[i - 1] = new_blocks_iter.next().unwrap();
-            }
-        }
-
-        todo!()
+        // cur_data_blocks -= INODE_DIRECT_CNT as u32;
+        // new_data_blocks -= INODE_DIRECT_CNT as u32;
+        //
+        // // alloc and fill in the indirect blocks
+        // for i in 1..MAX_INDIRECT_DEGREE + 1 {
+        //     // degree i
+        //     let cur_degree_cur_data_blocks =
+        //         min(cur_data_blocks, INDIRECT_CNT.pow(i as u32) as u32);
+        //     let cur_degree_new_data_blocks =
+        //         min(new_data_blocks, INDIRECT_CNT.pow(i as u32) as u32);
+        //
+        //     // indices mean the position of the last block
+        //     let mut cur_indices = Vec::new();
+        //     let mut new_indices = Vec::new();
+        //
+        //     // get the current indices and new indices
+        //     for j in (0..i).rev() {
+        //         cur_indices.push(
+        //             (cur_degree_cur_data_blocks % INDIRECT_CNT.pow((j + 1) as u32) as u32)
+        //                 / INDIRECT_CNT.pow(j as u32) as u32,
+        //         );
+        //         new_indices.push(
+        //             (cur_degree_new_data_blocks % INDIRECT_CNT.pow((j + 1) as u32) as u32)
+        //                 / INDIRECT_CNT.pow(j as u32) as u32,
+        //         );
+        //     }
+        //
+        //     //
+        //     loop {
+        //         break;
+        //     }
+        //
+        //     if cur_data_blocks == 0 {
+        //         self.indirect[i - 1] = new_blocks_iter.next().unwrap();
+        //     }
+        // }
+        //
+        // todo!()
     }
 
     /// Clear size of current inode, return the block_ids of data blocks
     pub fn clear_size(&mut self, block_device: &Arc<dyn BlockDevice>) -> Vec<u32> {
         let mut v: Vec<u32> = Vec::new();
-        let mut data_blocks = self.data_blocks() as usize;
+        let data_blocks = self.data_blocks() as usize;
         self.size = 0;
         let mut cur_data_blocks = 0usize;
 
@@ -328,10 +334,10 @@ impl DirEntry {
         }
     }
     pub fn as_bytes(&self) -> &[u8] {
-        unsafe { core::mem::transmute(self) }
+        unsafe { core::slice::from_raw_parts(self as *const _  as usize as *const u8, DIR_ENTRY_SIZE)}
     }
     pub fn as_bytes_mut(&mut self) -> &mut [u8] {
-        unsafe { core::mem::transmute(self) }
+        unsafe { core::slice::from_raw_parts_mut(self as *mut _ as usize as *mut u8, DIR_ENTRY_SIZE) }
     }
     pub fn name(&self) -> &str {
         let len = self

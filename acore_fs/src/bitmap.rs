@@ -22,7 +22,9 @@ impl BitmapManager {
                 self.start_block_id + block_pos,
                 Arc::clone(block_device),
             );
-            let mut bitmap_block = cache.lock().as_mut_ref::<BitmapBlock>(0);
+            let mut bitmap_block_lock = cache.lock();
+            let bitmap_block = bitmap_block_lock.as_mut_ref::<BitmapBlock>(0);
+
             for (bits64_pos, bits64) in bitmap_block.iter_mut().enumerate() {
                 if *bits64 != u64::MAX {
                     let inner_pos = bits64.trailing_ones() as usize;
@@ -43,7 +45,8 @@ impl BitmapManager {
             self.start_block_id + block_pos,
             Arc::clone(block_device),
         );
-        let mut bitmap_block = cache.lock().as_mut_ref::<BitmapBlock>(0);
+        let mut bitmap_block_lock = cache.lock();
+        let bitmap_block = bitmap_block_lock.as_mut_ref::<BitmapBlock>(0);
         assert_ne!(bitmap_block[bits64_pos] & (1u64 << inner_pos), 0);
         bitmap_block[bits64_pos] ^= 1u64 << inner_pos;
     }

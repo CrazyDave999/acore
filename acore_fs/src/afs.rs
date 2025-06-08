@@ -52,13 +52,16 @@ impl AcoreFileSystem {
         // clear all blocks
         for i in 0..total_blocks {
             let cache = get_block_cache(i as usize, Arc::clone(&block_device));
-            let data_block = cache.lock().as_mut_ref::<DataBlock>(0);
+            let mut data_block_lock = cache.lock();
+            let data_block = data_block_lock.as_mut_ref::<DataBlock>(0);
+
             data_block.clear();
         }
 
         // initialize SuperBlock
-        let super_block = get_block_cache(0, Arc::clone(&block_device)).lock()
-            .as_mut_ref::<SuperBlock>(0);
+        let cache = get_block_cache(0, Arc::clone(&block_device));
+        let mut super_block_lock = cache.lock();
+        let super_block = super_block_lock.as_mut_ref::<SuperBlock>(0);
         super_block.init(
             inode_bitmap_blocks,
             inode_blocks,
@@ -69,17 +72,20 @@ impl AcoreFileSystem {
         // create root inode
         assert_eq!(afs.alloc_inode_block(), 0);
         let (root_block_id, root_block_offset) = afs.get_disk_inode_pos(0);
-        let root_disk_inode = get_block_cache(root_block_id as usize, Arc::clone(&block_device))
-            .lock()
-            .as_mut_ref::<DiskInode>(root_block_offset);
+
+        let cache = get_block_cache(root_block_id as usize, Arc::clone(&block_device));
+        let mut root_disk_inode_lock = cache.lock();
+        let root_disk_inode = root_disk_inode_lock.as_mut_ref::<DiskInode>(root_block_offset);
+
         root_disk_inode.init(DiskInodeType::Directory);
         sync_all();
         Arc::new(Mutex::new(afs))
     }
     pub fn open(block_device: Arc<dyn BlockDevice>) -> Arc<Mutex<Self>> {
-        let super_block = get_block_cache(0, Arc::clone(&block_device))
-            .lock()
-            .as_ref::<SuperBlock>(0);
+        let cache =  get_block_cache(0, Arc::clone(&block_device));
+        let super_block_lock = cache.lock();
+        let super_block = super_block_lock.as_ref::<SuperBlock>(0);
+
         assert!(super_block.is_valid(), "Invalid Acore File System");
         let inode_bitmap = BitmapManager::new(1, super_block.inode_bitmap_blocks as usize);
         let data_bitmap = BitmapManager::new(
@@ -104,9 +110,9 @@ impl AcoreFileSystem {
         self.data_bitmap.alloc(&self.block_device).unwrap() as u32 + self.data_start_block
     }
     pub fn dealloc_data_block(&mut self, block_id: u32) {
-        let data_block = get_block_cache(block_id as usize, Arc::clone(&self.block_device))
-            .lock()
-            .as_mut_ref::<DataBlock>(0);
+        let cache = get_block_cache(block_id as usize, Arc::clone(&self.block_device));
+        let mut data_block_lock = cache.lock();
+        let data_block = data_block_lock.as_mut_ref::<DataBlock>(0);
         data_block.clear();
         self.data_bitmap.dealloc(
             &self.block_device,
