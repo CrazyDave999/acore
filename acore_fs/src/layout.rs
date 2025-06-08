@@ -179,20 +179,108 @@ impl DiskInode {
         }
         write_size
     }
+    /// Return the number of data blocks used by this inode, not including the indirect blocks.
+    fn data_blocks(&self) -> u32 {
+        (self.size + BLOCK_SIZE as u32 - 1) / BLOCK_SIZE as u32
+    }
 
-    /// increase size of current inode, with given new data blocks
+    /// Return number of blocks needed including indirect blocks
+    pub fn total_blocks(size: u32) -> u32 {
+        let data_blocks = (size + BLOCK_SIZE as u32 - 1) / BLOCK_SIZE as u32;
+        let mut total_blocks = data_blocks;
+
+        for degree in 1..=MAX_INDIRECT_DEGREE {
+            // todo
+        }
+
+        total_blocks
+    }
+
+    pub fn blocks_num_needed(&self, new_size: u32) -> u32 {
+        assert!(new_size >= self.size);
+        Self::total_blocks(new_size) - self.total_blocks(self.size)
+    }
+
+    /// Increase size of current inode, with given new data blocks
     pub fn increase_size(
         &mut self,
         new_size: u32,
         new_blocks: Vec<u32>,
         block_device: &Arc<dyn BlockDevice>,
     ) {
+        let mut cur_data_blocks = self.data_blocks();
+        self.size = new_size;
+        let mut new_data_blocks = self.data_blocks();
+        let mut new_blocks_iter = new_blocks.into_iter();
+
+        // fill in the direct blocks
+        while cur_data_blocks < min(INODE_DIRECT_CNT as u32, new_data_blocks) {
+            self.direct[cur_data_blocks as usize] = new_blocks_iter.next().unwrap();
+            cur_data_blocks += 1;
+        }
+
+        if new_data_blocks <= INODE_DIRECT_CNT as u32 {
+            return;
+        }
+        todo!("Handle indirect blocks");
+
+        cur_data_blocks -= INODE_DIRECT_CNT as u32;
+        new_data_blocks -= INODE_DIRECT_CNT as u32;
+
+        // alloc and fill in the indirect blocks
+        for i in 1..MAX_INDIRECT_DEGREE + 1 {
+            // degree i
+            let cur_degree_cur_data_blocks =
+                min(cur_data_blocks, INDIRECT_CNT.pow(i as u32) as u32);
+            let cur_degree_new_data_blocks =
+                min(new_data_blocks, INDIRECT_CNT.pow(i as u32) as u32);
+
+            // indices mean the position of the last block
+            let mut cur_indices = Vec::new();
+            let mut new_indices = Vec::new();
+
+            // get the current indices and new indices
+            for j in (0..i).rev() {
+                cur_indices.push(
+                    (cur_degree_cur_data_blocks % INDIRECT_CNT.pow((j + 1) as u32) as u32)
+                        / INDIRECT_CNT.pow(j as u32) as u32,
+                );
+                new_indices.push(
+                    (cur_degree_new_data_blocks % INDIRECT_CNT.pow((j + 1) as u32) as u32)
+                        / INDIRECT_CNT.pow(j as u32) as u32,
+                );
+            }
+
+            //
+            loop {
+                break;
+            }
+
+            if cur_data_blocks == 0 {
+                self.indirect[i - 1] = new_blocks_iter.next().unwrap();
+            }
+        }
+
         todo!()
     }
 
-    /// clear size of current inode, return the data blocks
+    /// Clear size of current inode, return the block_ids of data blocks
     pub fn clear_size(&mut self, block_device: &Arc<dyn BlockDevice>) -> Vec<u32> {
-        todo!()
+        let mut v: Vec<u32> = Vec::new();
+        let mut data_blocks = self.data_blocks() as usize;
+        self.size = 0;
+        let mut cur_data_blocks = 0usize;
+
+        // direct
+        while cur_data_blocks < min(INODE_DIRECT_CNT, data_blocks) {
+            v.push(self.direct[cur_data_blocks]);
+            self.direct[cur_data_blocks] = 0;
+            cur_data_blocks += 1;
+        }
+        if data_blocks <= INODE_DIRECT_CNT {
+            return v;
+        }
+        todo!("Handle indirect blocks");
     }
 }
 

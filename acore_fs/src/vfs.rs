@@ -30,13 +30,20 @@ impl Inode {
         }
     }
     fn increase_size(&self, new_size: u32) {
-        // let mut fs = self.fs.lock();
+        let mut fs = self.fs.lock();
         let disk_inode = self.get_disk_inode_mut();
         if new_size <= disk_inode.size {
             return;
         }
-        todo!()
+        let blocks_needed = disk_inode.blocks_num_needed(new_size);
+        let mut v: Vec<u32> = Vec::new();
+        for _ in 0..blocks_needed {
+            v.push(fs.alloc_data_block());
+        }
+        disk_inode.increase_size(new_size, v, &self.block_device);
     }
+
+    /// Find an inode by name in current directory
     pub fn access_dir_entry(
         &self,
         name: &str,
