@@ -10,7 +10,7 @@ impl BlockDevice for BlockFile {
         let mut file = self.0.lock().unwrap();
         file.seek(SeekFrom::Start((block_id * BLOCK_SIZE) as u64))
             .expect("Error when seeking!");
-        assert_eq!(file.read(buf).unwrap(), BLOCK_SIZE, "Not a complete block!");
+        assert_eq!(file.read(buf).unwrap(), BLOCK_SIZE, "Not a complete block!, block_id: {}", block_id);
     }
 
     fn write_block(&self, block_id: usize, buf: &[u8]) {
@@ -26,6 +26,7 @@ fn main() {
 }
 
 fn acore_fs_pack() -> std::io::Result<()> {
+    println!("AcoreFS packer started...");
     let matches = App::new("EasyFileSystem packer")
         .arg(
             Arg::with_name("source")
@@ -55,9 +56,8 @@ fn acore_fs_pack() -> std::io::Result<()> {
         f
     })));
 
-    // 16MiB, at most 4096 inodes
-    let afs = AcoreFileSystem::new(block_file, 16 * 2048, 4096);
-    let root_inode = AcoreFileSystem::root_inode(afs.clone());
+    println!("Successfully created fs.img with size: {} bytes", 16 * 2048 * BLOCK_SIZE);
+
     let apps: Vec<_> = read_dir(src_path)
         .unwrap()
         .into_iter()
@@ -67,20 +67,34 @@ fn acore_fs_pack() -> std::io::Result<()> {
             name_with_ext
         })
         .collect();
+
+    println!("Found {} apps to pack", apps.len());
+
+    // 16MiB, at most 4096 inodes
+    let afs = AcoreFileSystem::new(block_file, 16 * 2048, 4096);
+
+    println!("Successfully created AcoreFileSystem");
+
+    let root_inode = AcoreFileSystem::root_inode(afs.clone());
+
+    println!("Successfully created root inode");
+
     for app in apps {
+
+
         // load app data from host file system
         let mut host_file = File::open(format!("{}{}", target_path, app)).unwrap();
         let mut all_data: Vec<u8> = Vec::new();
         host_file.read_to_end(&mut all_data).unwrap();
-        // create a file in easy-fs
+        // create a file in acore-fs
 
         let inode = root_inode.access_dir_entry(
             app.as_str(),
             acore_fs::DiskInodeType::File,
             true,
         ).unwrap();
-        // write data to easy-fs
-
+        // write data to acore-fs
+        println!("Processing file: {}, size: {} bytes", app, all_data.len());
         inode.write_at(0, all_data.as_slice());
     }
     Ok(())

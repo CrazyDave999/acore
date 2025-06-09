@@ -85,20 +85,37 @@ impl Inode {
                 return Some(Arc::new(inode));
             }
         }
+        drop(disk_inode_lock);
+        drop(cache);
 
         // no such file in current directory
         if create {
             // create a new file
             let mut fs = self.fs.lock();
+
+            println!("access_dir_entry. got fs lock");
+
             let new_inode_id = fs.alloc_inode_block();
             let (new_block_id, new_block_offset) = fs.get_disk_inode_pos(new_inode_id);
+
+            println!("new_block_id: {}, new_block_offset: {}", new_block_id, new_block_offset);
 
             let cache = get_block_cache(new_block_id as usize, Arc::clone(&self.block_device));
             let mut new_disk_inode_lock = cache.lock();
             let new_disk_inode = new_disk_inode_lock.as_mut_ref::<DiskInode>(new_block_offset);
+
+            println!("access_dir_entry. got new cache");
+
             new_disk_inode.init(type_);
 
+            drop(new_disk_inode_lock);
+            drop(cache);
+
             // modify the current disk inode
+            let cache = get_block_cache(self.block_id, Arc::clone(&self.block_device));
+            let mut disk_inode_lock = cache.lock();
+            let disk_inode = disk_inode_lock.as_mut_ref::<DiskInode>(self.block_offset);
+
             let file_count = (disk_inode.size as usize) / DIR_ENTRY_SIZE;
             let new_size = (file_count + 1) * DIR_ENTRY_SIZE;
 
@@ -110,6 +127,10 @@ impl Inode {
                 new_dir_entry.as_bytes(),
                 &self.block_device,
             );
+
+            drop(disk_inode_lock);
+            drop(cache);
+
             sync_all();
             Some(Arc::new(Self::new(
                 new_block_id,
@@ -141,6 +162,9 @@ impl Inode {
         self.increase_size((offset + buf.len()) as u32, disk_inode, &mut fs);
 
         let write_size = disk_inode.write_at(offset, buf, &self.block_device);
+
+        drop(disk_inode_lock);
+        drop(cache);
 
         sync_all();
         write_size

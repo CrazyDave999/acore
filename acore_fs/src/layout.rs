@@ -192,11 +192,29 @@ impl DiskInode {
 
     /// Return number of blocks needed including indirect blocks
     pub fn total_blocks(size: u32) -> u32 {
-        let data_blocks = (size + BLOCK_SIZE as u32 - 1) / BLOCK_SIZE as u32;
+        let mut data_blocks = (size + BLOCK_SIZE as u32 - 1) / BLOCK_SIZE as u32;
         let mut total_blocks = data_blocks;
 
-        for degree in 1..=MAX_INDIRECT_DEGREE {
-            // todo
+        // calculate indirect blocks
+        if data_blocks <= INODE_DIRECT_CNT as u32 {
+            return total_blocks;
+        }
+
+        data_blocks -= INODE_DIRECT_CNT as u32;
+
+        for degree in 0..MAX_INDIRECT_DEGREE {
+            total_blocks += 1; // root
+            let full_num = INDIRECT_CNT.pow((degree + 1) as u32) as u32;
+            let cur_degree_data_blocks = min(data_blocks, full_num);
+            for depth in 0..degree {
+                // non-leaf layer
+                let son_full_num = INDIRECT_CNT.pow((degree - depth) as u32) as u32;
+                total_blocks += (cur_degree_data_blocks + son_full_num - 1) / son_full_num;
+            }
+            data_blocks -= cur_degree_data_blocks;
+            if data_blocks == 0 {
+                break;
+            }
         }
 
         total_blocks
@@ -228,56 +246,113 @@ impl DiskInode {
         if new_data_blocks <= INODE_DIRECT_CNT as u32 {
             return;
         }
-        todo!("Handle indirect blocks");
 
-        // cur_data_blocks -= INODE_DIRECT_CNT as u32;
-        // new_data_blocks -= INODE_DIRECT_CNT as u32;
-        //
-        // // alloc and fill in the indirect blocks
-        // for i in 1..MAX_INDIRECT_DEGREE + 1 {
-        //     // degree i
-        //     let cur_degree_cur_data_blocks =
-        //         min(cur_data_blocks, INDIRECT_CNT.pow(i as u32) as u32);
-        //     let cur_degree_new_data_blocks =
-        //         min(new_data_blocks, INDIRECT_CNT.pow(i as u32) as u32);
-        //
-        //     // indices mean the position of the last block
-        //     let mut cur_indices = Vec::new();
-        //     let mut new_indices = Vec::new();
-        //
-        //     // get the current indices and new indices
-        //     for j in (0..i).rev() {
-        //         cur_indices.push(
-        //             (cur_degree_cur_data_blocks % INDIRECT_CNT.pow((j + 1) as u32) as u32)
-        //                 / INDIRECT_CNT.pow(j as u32) as u32,
-        //         );
-        //         new_indices.push(
-        //             (cur_degree_new_data_blocks % INDIRECT_CNT.pow((j + 1) as u32) as u32)
-        //                 / INDIRECT_CNT.pow(j as u32) as u32,
-        //         );
-        //     }
-        //
-        //     //
-        //     loop {
-        //         break;
-        //     }
-        //
-        //     if cur_data_blocks == 0 {
-        //         self.indirect[i - 1] = new_blocks_iter.next().unwrap();
-        //     }
-        // }
-        //
-        // todo!()
+        cur_data_blocks -= INODE_DIRECT_CNT as u32;
+        new_data_blocks -= INODE_DIRECT_CNT as u32;
+
+
+        for i in 0..MAX_INDIRECT_DEGREE {
+            let full_num = INDIRECT_CNT.pow((i + 1) as u32) as u32;
+
+            if cur_data_blocks >= full_num {
+                cur_data_blocks -= full_num;
+                new_data_blocks -= full_num;
+                continue;
+            }
+
+            let cur_sub_tree_data_blocks = cur_data_blocks;
+            let new_sub_tree_data_blocks = min(full_num, new_data_blocks);
+
+            if cur_sub_tree_data_blocks == 0 {
+                self.indirect[i] = new_blocks_iter.next().unwrap();
+            }
+
+            Self::dfs_fill_indirect(
+                0,
+                i,
+                self.indirect[i],
+                cur_sub_tree_data_blocks,
+                new_sub_tree_data_blocks,
+                &mut new_blocks_iter,
+                block_device,
+            );
+
+            cur_data_blocks -= new_sub_tree_data_blocks;
+            new_data_blocks -= new_sub_tree_data_blocks;
+
+            if new_data_blocks == 0 {
+                break;
+            }
+        }
     }
 
-    /// Clear size of current inode, return the block_ids of data blocks
+    fn dfs_fill_indirect(
+        depth: usize,
+        degree: usize,
+        block_id: u32,
+        mut cur_sub_tree_data_blocks: u32,
+        mut new_sub_tree_data_blocks: u32,
+        new_blocks_iter: &mut dyn Iterator<Item = u32>,
+        block_device: &Arc<dyn BlockDevice>,
+    ) {
+        // get cur nodes
+        let mut cache = get_block_cache(block_id as usize, Arc::clone(block_device));
+        let mut indirect_block_lock = cache.lock();
+        let indirect_block = indirect_block_lock.as_mut_ref::<IndirectBlock>(0);
+
+        if depth == degree {
+            // leaf node
+            for i in cur_sub_tree_data_blocks as usize..new_sub_tree_data_blocks as usize {
+                indirect_block[i] = new_blocks_iter.next().unwrap();
+            }
+            return;
+        }
+
+        // not leaf node
+        // max data blocks that cur node's son can hold in its subtree
+        let son_full_num = INDIRECT_CNT.pow((degree - depth) as u32) as u32;
+
+        for i in 0..INDIRECT_CNT {
+            if cur_sub_tree_data_blocks >= son_full_num {
+                cur_sub_tree_data_blocks -= son_full_num;
+                new_sub_tree_data_blocks -= son_full_num;
+                continue;
+            }
+
+            let son_cur_sub_tree_data_blocks = cur_sub_tree_data_blocks;
+            let son_new_sub_tree_data_blocks = min(son_full_num, new_sub_tree_data_blocks);
+
+            if son_cur_sub_tree_data_blocks == 0 {
+                indirect_block[i] = new_blocks_iter.next().unwrap();
+            }
+            Self::dfs_fill_indirect(
+                depth + 1,
+                degree,
+                indirect_block[i],
+                son_cur_sub_tree_data_blocks,
+                son_new_sub_tree_data_blocks,
+                new_blocks_iter,
+                block_device,
+            );
+
+            cur_sub_tree_data_blocks -= son_new_sub_tree_data_blocks;
+            new_sub_tree_data_blocks -= son_new_sub_tree_data_blocks;
+
+            if new_sub_tree_data_blocks == 0 {
+                break;
+            }
+        }
+    }
+
+    /// Clear size of current inode, return the block_ids of data blocks, including indirect blocks.
     pub fn clear_size(&mut self, block_device: &Arc<dyn BlockDevice>) -> Vec<u32> {
         let mut v: Vec<u32> = Vec::new();
         let data_blocks = self.data_blocks() as usize;
         self.size = 0;
+
+        // the data blocks cleared currently
         let mut cur_data_blocks = 0usize;
 
-        // direct
         while cur_data_blocks < min(INODE_DIRECT_CNT, data_blocks) {
             v.push(self.direct[cur_data_blocks]);
             self.direct[cur_data_blocks] = 0;
@@ -286,7 +361,51 @@ impl DiskInode {
         if data_blocks <= INODE_DIRECT_CNT {
             return v;
         }
-        todo!("Handle indirect blocks");
+
+        for i in 0..MAX_INDIRECT_DEGREE {
+            if self.indirect[i] != 0 {
+                v.push(self.indirect[i]);
+                v.extend(Self::dfs_clear_indirect(
+                    0,
+                    i,
+                    self.indirect[i],
+                    block_device,
+                ));
+            }
+            self.indirect[i] = 0;
+        }
+        v
+    }
+
+    fn dfs_clear_indirect(
+        depth: usize,
+        degree: usize,
+        block_id: u32,
+        block_device: &Arc<dyn BlockDevice>,
+    ) -> Vec<u32> {
+        // get cur nodes
+        let mut cache = get_block_cache(block_id as usize, Arc::clone(block_device));
+        let mut indirect_block_lock = cache.lock();
+        let indirect_block = indirect_block_lock.as_mut_ref::<IndirectBlock>(0);
+
+        let mut v = Vec::new();
+
+        for i in 0..INDIRECT_CNT {
+            if indirect_block[i] != 0 {
+                v.push(indirect_block[i]);
+                if depth < degree {
+                    // not leaf node
+                    v.extend(Self::dfs_clear_indirect(
+                        depth + 1,
+                        degree,
+                        indirect_block[i],
+                        block_device,
+                    ));
+                }
+            }
+            indirect_block[i] = 0;
+        }
+        v
     }
 }
 
@@ -334,10 +453,14 @@ impl DirEntry {
         }
     }
     pub fn as_bytes(&self) -> &[u8] {
-        unsafe { core::slice::from_raw_parts(self as *const _  as usize as *const u8, DIR_ENTRY_SIZE)}
+        unsafe {
+            core::slice::from_raw_parts(self as *const _ as usize as *const u8, DIR_ENTRY_SIZE)
+        }
     }
     pub fn as_bytes_mut(&mut self) -> &mut [u8] {
-        unsafe { core::slice::from_raw_parts_mut(self as *mut _ as usize as *mut u8, DIR_ENTRY_SIZE) }
+        unsafe {
+            core::slice::from_raw_parts_mut(self as *mut _ as usize as *mut u8, DIR_ENTRY_SIZE)
+        }
     }
     pub fn name(&self) -> &str {
         let len = self

@@ -65,8 +65,8 @@ pub fn get_block_cache(
 
 /// Sync all block caches to disk
 pub fn sync_all () {
-    let mut block_manager = BLOCK_MANAGER.lock();
-    for (_, cache) in block_manager.lru_cache.iter_mut() {
+    let block_manager = BLOCK_MANAGER.lock();
+    for (_, cache) in block_manager.lru_cache.iter() {
         cache.lock().sync();
     }
 }

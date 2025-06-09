@@ -1,6 +1,8 @@
 use crate::bitmap::BitmapManager;
 use crate::block_manager::{get_block_cache, sync_all};
-use crate::layout::{DataBlock, DiskInode, DiskInodeType, SuperBlock, DISK_INODE_PER_BLOCK, DISK_INODE_SIZE};
+use crate::layout::{
+    DataBlock, DiskInode, DiskInodeType, SuperBlock, DISK_INODE_PER_BLOCK, DISK_INODE_SIZE,
+};
 use crate::{BlockDevice, Inode, BLOCK_SIZE};
 use alloc::sync::Arc;
 use spin::Mutex;
@@ -30,8 +32,8 @@ impl AcoreFileSystem {
                 / BLOCK_SIZE as u32;
         let inode_bitmap_blocks = (inode_num + BITS_PER_BLOCK as u32 - 1) / BITS_PER_BLOCK as u32;
         let data_total_blocks = total_blocks - 1 - inode_blocks - inode_bitmap_blocks;
-        let data_bitmap_blocks = (data_total_blocks + BITS_PER_BLOCK as u32) / (BITS_PER_BLOCK as
-            u32 + 1);
+        let data_bitmap_blocks =
+            (data_total_blocks + BITS_PER_BLOCK as u32) / (BITS_PER_BLOCK as u32 + 1);
         let data_blocks = data_bitmap_blocks * BITS_PER_BLOCK as u32;
 
         let inode_bitmap = BitmapManager::new(1, inode_bitmap_blocks as usize);
@@ -39,8 +41,7 @@ impl AcoreFileSystem {
             (1 + inode_bitmap_blocks) as usize,
             data_bitmap_blocks as usize,
         );
-        let inode_start_block =
-            1 + inode_bitmap_blocks + data_bitmap_blocks;
+        let inode_start_block = 1 + inode_bitmap_blocks + data_bitmap_blocks;
         let data_start_block = inode_start_block + inode_blocks;
         let mut afs = Self {
             block_device: Arc::clone(&block_device),
@@ -49,6 +50,7 @@ impl AcoreFileSystem {
             inode_start_block,
             data_start_block,
         };
+
         // clear all blocks
         for i in 0..total_blocks {
             let cache = get_block_cache(i as usize, Arc::clone(&block_device));
@@ -58,10 +60,13 @@ impl AcoreFileSystem {
             data_block.clear();
         }
 
+        println!("All blocks cleared");
+
         // initialize SuperBlock
         let cache = get_block_cache(0, Arc::clone(&block_device));
         let mut super_block_lock = cache.lock();
         let super_block = super_block_lock.as_mut_ref::<SuperBlock>(0);
+
         super_block.init(
             inode_bitmap_blocks,
             inode_blocks,
@@ -69,20 +74,34 @@ impl AcoreFileSystem {
             data_blocks,
         );
 
+        drop(super_block_lock);
+        drop(cache);
+
+
+        println!("SuperBlock initialized");
+
         // create root inode
         assert_eq!(afs.alloc_inode_block(), 0);
         let (root_block_id, root_block_offset) = afs.get_disk_inode_pos(0);
+        eprintln!("root_block_id: {}", root_block_id);
 
         let cache = get_block_cache(root_block_id as usize, Arc::clone(&block_device));
         let mut root_disk_inode_lock = cache.lock();
         let root_disk_inode = root_disk_inode_lock.as_mut_ref::<DiskInode>(root_block_offset);
 
         root_disk_inode.init(DiskInodeType::Directory);
+
+        drop(root_disk_inode_lock);
+        drop(cache);
+
+        println!("Root inode initialized");
+
         sync_all();
+
         Arc::new(Mutex::new(afs))
     }
     pub fn open(block_device: Arc<dyn BlockDevice>) -> Arc<Mutex<Self>> {
-        let cache =  get_block_cache(0, Arc::clone(&block_device));
+        let cache = get_block_cache(0, Arc::clone(&block_device));
         let super_block_lock = cache.lock();
         let super_block = super_block_lock.as_ref::<SuperBlock>(0);
 
@@ -124,7 +143,7 @@ impl AcoreFileSystem {
     pub fn get_disk_inode_pos(&self, inode_id: u32) -> (u32, usize) {
         (
             self.inode_start_block + inode_id / DISK_INODE_PER_BLOCK as u32,
-            (inode_id as usize % DISK_INODE_PER_BLOCK) * DISK_INODE_SIZE
+            (inode_id as usize % DISK_INODE_PER_BLOCK) * DISK_INODE_SIZE,
         )
     }
 
