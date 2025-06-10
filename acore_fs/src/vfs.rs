@@ -162,7 +162,11 @@ impl Inode {
 
         self.increase_size((offset + buf.len()) as u32, disk_inode, &mut fs);
 
+        // println!("write_at. increase_size ok");
+
         let write_size = disk_inode.write_at(offset, buf, &self.block_device);
+
+        // println!("write_at. write ok");
 
         drop(disk_inode_lock);
         drop(cache);

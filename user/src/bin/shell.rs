@@ -12,6 +12,7 @@ const CR: u8 = 0x0du8;
 const DL: u8 = 0x7fu8;
 const BS: u8 = 0x08u8;
 
+use alloc::format;
 use alloc::string::String;
 use log::info;
 use user_lib::console::getchar;
@@ -21,18 +22,22 @@ use user_lib::{exec, fork, waitpid};
 pub fn main() -> i32 {
     println!("[shell] This is CrazyDave shell.");
     let mut line: String = String::new();
-    info!("^_^ $ ");
+    let pwd = "/";
+    info!("^_^ {}$ ", pwd);
     loop {
         let c = getchar();
         match c {
             LF | CR => {
                 println!("");
                 if !line.is_empty() {
+                    // file name
                     line.push('\0');
+
                     let pid = fork();
                     if pid == 0 {
                         // child process
-                        if exec(line.as_str()) == -1 {
+                        let abs_path = format!("{}{}", pwd, line);
+                        if exec(abs_path.as_str()) == -1 {
                             println!("[shell] Error when executing!");
                             return -4;
                         }
@@ -45,7 +50,7 @@ pub fn main() -> i32 {
                     }
                     line.clear();
                 }
-                info!("^_^ $ ");
+                info!("^_^ {}$ ", pwd);
             }
             BS | DL => {
                 if !line.is_empty() {

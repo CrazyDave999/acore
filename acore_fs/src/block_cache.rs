@@ -4,7 +4,7 @@ use crate::BLOCK_SIZE;
 
 pub struct BlockCache {
     data: [u8; BLOCK_SIZE],
-    block_id: usize,
+    pub block_id: usize,
     block_device: Arc<dyn BlockDevice>,
     dirty: bool,
 }

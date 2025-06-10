@@ -24,6 +24,7 @@ impl BlockManager {
         block_id: usize,
         block_device: Arc<dyn BlockDevice>,
     ) -> Arc<Mutex<BlockCache>> {
+        // assert!(block_id < 1000000, "Block ID too large: {}", block_id);
         if let Some((_, cache)) = self.queue.iter().find(|(id,_)| *id == block_id) {
             cache.clone()
         } else {

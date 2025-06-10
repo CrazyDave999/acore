@@ -79,7 +79,18 @@ impl DiskInode {
 
     /// Get block_id with given inner_id
     pub fn get_block_id(&self, inner_id: u32, block_device: &Arc<dyn BlockDevice>) -> u32 {
-        let inner_id = inner_id as usize;
+        let mut inner_id = inner_id as usize;
+
+        if inner_id < INODE_DIRECT_CNT {
+            assert!(
+                self.direct[inner_id] < 1000_000,
+                "inner_id: {}, self.direct[inner_id]: {}",
+                inner_id,
+                self.direct[inner_id]
+            );
+            return self.direct[inner_id];
+        }
+
         let end_id = INODE_DIRECT_CNT + {
             let mut res = 0;
             for degree in 0..MAX_INDIRECT_DEGREE {
@@ -88,34 +99,48 @@ impl DiskInode {
             res
         };
 
-        if inner_id < INODE_DIRECT_CNT {
-            self.direct[inner_id]
-        } else if inner_id < end_id {
-            let mut inner_id = inner_id - INODE_DIRECT_CNT;
-            // cur total end id for this degree's indirect block can manage
-            for (degree, &root_id) in self.indirect.iter().enumerate() {
-                let cur_end_id = INDIRECT_CNT.pow((degree + 1) as u32);
-                if inner_id < cur_end_id {
-                    let mut block_id = root_id;
-                    for i in (1..degree + 1).rev() {
-                        let cache = get_block_cache(block_id as usize, Arc::clone(block_device));
-                        block_id = cache.lock().as_ref::<IndirectBlock>(0)
-                            [inner_id / INDIRECT_CNT.pow(i as u32)];
-                        inner_id %= INDIRECT_CNT.pow(i as u32);
-                    }
-                    let cache = get_block_cache(block_id as usize, Arc::clone(block_device));
-                    block_id = cache.lock().as_ref::<IndirectBlock>(0)[inner_id % INDIRECT_CNT];
-                    return block_id;
-                }
-                if degree == MAX_INDIRECT_DEGREE - 1 {
-                    panic!("Should not reach here");
-                }
-                inner_id -= cur_end_id;
+        assert!(
+            inner_id < end_id,
+            "inner_id {} out of range 0-{}",
+            inner_id,
+            end_id
+        );
+
+        inner_id -= INODE_DIRECT_CNT;
+        // cur total end id for this degree's indirect block can manage
+        for (degree, &root_id) in self.indirect.iter().enumerate() {
+            let full_num = INDIRECT_CNT.pow((degree + 1) as u32);
+            if inner_id >= full_num {
+                inner_id -= full_num;
+                continue;
             }
-            panic!("Should not reach here");
-        } else {
-            panic!("File too large");
+
+            let mut block_id = root_id;
+
+            // println!("root_id: {}, degree: {}, inner_id: {}", root_id, degree, inner_id);
+
+            for depth in 0..=degree {
+                // cur node
+                let cache = get_block_cache(block_id as usize, Arc::clone(block_device));
+                let indirect_block_lock = cache.lock();
+                let indirect_block = indirect_block_lock.as_ref::<IndirectBlock>(0);
+
+                let son_full_num = INDIRECT_CNT.pow((degree - depth) as u32);
+                block_id = indirect_block[inner_id / son_full_num];
+
+                assert!(
+                    block_id < 1000_000,
+                    "inner_id: {}, block_id: {}",
+                    inner_id,
+                    block_id
+                );
+
+                inner_id %= son_full_num;
+            }
+
+            return block_id;
         }
+        panic!("Should not reach here");
     }
 
     /// read from current inode(file)
@@ -162,9 +187,15 @@ impl DiskInode {
         buf: &[u8],
         block_device: &Arc<dyn BlockDevice>,
     ) -> usize {
+        // println!(
+        //     "write_at. offset: {}, buf.len: {}, self.size: {}",
+        //     offset,
+        //     buf.len(),
+        //     self.size
+        // );
         let mut start = offset;
         let end = min(offset + buf.len(), self.size as usize);
-        assert!(end > start);
+        assert!(end > start, "Invalid write. start: {}, end: {}", start, end);
         let mut start_inner_block_id = start / BLOCK_SIZE;
         let mut write_size = 0usize;
         loop {
@@ -238,6 +269,12 @@ impl DiskInode {
         let mut cur_data_blocks = self.data_blocks();
         self.size = new_size;
         let mut new_data_blocks = self.data_blocks();
+        // println!(
+        //     "increase_size. cur_data_blocks: {}, new_data_blocks: {}, new_blocks.len: {}",
+        //     cur_data_blocks,
+        //     new_data_blocks,
+        //     new_blocks.len()
+        // );
         let mut new_blocks_iter = new_blocks.into_iter();
 
         // fill in the direct blocks
@@ -253,9 +290,20 @@ impl DiskInode {
         cur_data_blocks -= INODE_DIRECT_CNT as u32;
         new_data_blocks -= INODE_DIRECT_CNT as u32;
 
+        // println!(
+        //     "increase_size. cur_data_blocks: {}, new_data_blocks: {}, new_blocks_iter.len: {}",
+        //     cur_data_blocks,
+        //     new_data_blocks,
+        //     new_blocks_iter.clone().count()
+        // );
 
         for i in 0..MAX_INDIRECT_DEGREE {
             let full_num = INDIRECT_CNT.pow((i + 1) as u32) as u32;
+
+            // println!(
+            //     "increase_size. i: {}, full_num: {}, cur_data_blocks: {}, new_data_blocks: {}",
+            //     i, full_num, cur_data_blocks, new_data_blocks
+            // );
 
             if cur_data_blocks >= full_num {
                 cur_data_blocks -= full_num;
@@ -266,8 +314,18 @@ impl DiskInode {
             let cur_sub_tree_data_blocks = cur_data_blocks;
             let new_sub_tree_data_blocks = min(full_num, new_data_blocks);
 
+            // println!(
+            //     "increase_size. i: {}, cur_sub_tree_data_blocks: {}, new_sub_tree_data_blocks: {}",
+            //     i, cur_sub_tree_data_blocks, new_sub_tree_data_blocks
+            // );
+
             if cur_sub_tree_data_blocks == 0 {
                 self.indirect[i] = new_blocks_iter.next().unwrap();
+
+                // println!(
+                //     "increase_size. i: {}, self.indirect[i]: {}",
+                //     i, self.indirect[i]
+                // );
             }
 
             Self::dfs_fill_indirect(
@@ -280,13 +338,15 @@ impl DiskInode {
                 block_device,
             );
 
-            cur_data_blocks -= new_sub_tree_data_blocks;
+
+            cur_data_blocks = 0;
             new_data_blocks -= new_sub_tree_data_blocks;
 
             if new_data_blocks == 0 {
                 break;
             }
         }
+        assert!(new_blocks_iter.next().is_none());
     }
 
     fn dfs_fill_indirect(
@@ -338,7 +398,7 @@ impl DiskInode {
                 block_device,
             );
 
-            cur_sub_tree_data_blocks -= son_new_sub_tree_data_blocks;
+            cur_sub_tree_data_blocks = 0;
             new_sub_tree_data_blocks -= son_new_sub_tree_data_blocks;
 
             if new_sub_tree_data_blocks == 0 {
