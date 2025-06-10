@@ -71,6 +71,9 @@ impl Inode {
                 DIR_ENTRY_SIZE,
             );
             if dir_entry.name() == name {
+                drop(disk_inode_lock);
+                drop(cache);
+
                 let fs = self.fs.lock();
                 let (block_id, block_offset) = fs.get_disk_inode_pos(dir_entry.inode_id());
                 drop(fs);
@@ -81,7 +84,7 @@ impl Inode {
                     self.block_device.clone(),
                 );
                 if create {
-                    inode.clear()
+                    inode.clear();
                 }
                 return Some(Arc::new(inode));
             }
@@ -204,11 +207,13 @@ impl Inode {
         let cache = get_block_cache(self.block_id, Arc::clone(&self.block_device));
         let mut disk_inode_lock = cache.lock();
         let disk_inode = disk_inode_lock.as_mut_ref::<DiskInode>(self.block_offset);
-
         let data_blocks_dealloc = disk_inode.clear_size(&self.block_device);
         for block_id in data_blocks_dealloc {
             fs.dealloc_data_block(block_id);
         }
+        drop(disk_inode_lock);
+        drop(cache);
+
         sync_all()
     }
 }

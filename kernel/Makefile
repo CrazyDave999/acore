@@ -57,7 +57,7 @@ QEMU_ARGS := -machine virt \
 			 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 \
 
 
-run-inner: build
+run-inner:
 	@qemu-system-riscv64 $(QEMU_ARGS)
 
 debug: build

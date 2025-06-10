@@ -10,14 +10,12 @@ use crate::proc::proc_ctx::ProcContext;
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use alloc::collections::BTreeMap;
-use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
 use core::cell::RefMut;
 use lazy_static::lazy_static;
-use crate::println;
 
 #[derive(Debug)]
 pub enum ProcessState {

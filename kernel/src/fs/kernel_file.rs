@@ -6,6 +6,7 @@ use acore_fs::{DiskInodeType, Inode, BLOCK_SIZE};
 use crate::fs::File;
 use crate::sync::UPSafeCell;
 use acore_fs::AcoreFileSystem;
+use crate::console::stdout::print;
 use crate::drivers::BLOCK_DEVICE;
 use crate::println;
 

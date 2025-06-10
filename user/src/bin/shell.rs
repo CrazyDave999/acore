@@ -94,6 +94,7 @@ pub fn main(_argc: usize, _argv: &[&str]) -> i32 {
                             format!("{}\0", arg)
                         }
                     }).collect();
+
                     let mut args_addr: Vec<*const u8> = args_copy.iter().map(|arg| arg.as_ptr()).collect();
                     args_addr.push(0 as *const u8); // null-terminate the args
 
