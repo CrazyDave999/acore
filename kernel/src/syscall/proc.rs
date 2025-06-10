@@ -1,11 +1,13 @@
-use crate::mm::PageTable;
-use crate::proc::{exit_proc, get_cur_proc, get_cur_user_token, push_proc, switch_proc};
-use crate::timer::{get_time_ms};
-use crate::trap::TrapContext;
-use alloc::sync::Arc;
 use crate::console::shutdown;
-use crate::fs::File;
 use crate::fs::kernel_file::{KernelFile, OpenFlags};
+use crate::fs::File;
+use crate::mm::{PageTable, VirtAddr};
+use crate::proc::{exit_proc, get_cur_proc, get_cur_user_token, push_proc, switch_proc};
+use crate::timer::get_time_ms;
+use crate::trap::TrapContext;
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 pub fn sys_exit(exit_code: i32) -> ! {
     // println!("[kernel] sys_exit: pid: {}", sys_getpid());
@@ -38,25 +40,36 @@ pub fn sys_fork() -> isize {
     push_proc(new_proc);
     new_pid as isize
 }
-pub fn sys_exec(path: *const u8) -> isize {
+pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     // println!("[kernel] sys_exec: pid: {}", sys_getpid());
     let token = get_cur_user_token();
     let page_table = PageTable::from_token(token);
     let path = page_table.find_str((path as usize).into());
     // println!("path: {}", path);
 
-    // if let Some(data) = get_app_data_by_name(path.as_str()) {
-    //     get_cur_proc().unwrap().exec(data);
-    //     0
-    // } else {
-    //     -1
-    // }
+    // fetch args in user addr space
+    let cur_proc = get_cur_proc().unwrap();
+    let inner = cur_proc.exclusive_access();
+    let mut args_vec: Vec<String> = Vec::new();
+    loop {
+        let args_pa = inner.mm.page_table.find_pa(VirtAddr::from(args as usize)).unwrap().0;
+        unsafe {
+            let arg_str_ptr = *(args_pa as *const usize);
+            if arg_str_ptr == 0 {
+                break;
+            }
+            args_vec.push(inner.mm.read_str(VirtAddr::from(arg_str_ptr)));
+            args = args.add(1);
+        }
+    }
+    drop(inner);
 
     if let Some(app_kernel_file) = KernelFile::from_path(path.as_str(), OpenFlags::RDONLY) {
         let all_data = app_kernel_file.read_all();
-        let proc = get_cur_proc().unwrap();
-        proc.exec(all_data.as_slice());
-        0
+        let argc = args_vec.len();
+        cur_proc.exec(all_data.as_slice(), args_vec);
+        // return argc because cx.x[10] will be covered with it later
+        argc as isize
     } else {
         -1
     }

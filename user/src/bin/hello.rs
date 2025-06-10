@@ -5,7 +5,8 @@
 extern crate user_lib;
 
 #[no_mangle]
-fn main() -> i32 {
-    println!("Hello");
+pub fn main(argc: usize, argv: &[&str]) -> i32 {
+    println!("argc = {}", argc);
+    println!("argv = {:?}", argv);
     0
 }

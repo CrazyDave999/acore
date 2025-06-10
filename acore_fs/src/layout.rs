@@ -359,7 +359,7 @@ impl DiskInode {
         block_device: &Arc<dyn BlockDevice>,
     ) {
         // get cur nodes
-        let mut cache = get_block_cache(block_id as usize, Arc::clone(block_device));
+        let cache = get_block_cache(block_id as usize, Arc::clone(block_device));
         let mut indirect_block_lock = cache.lock();
         let indirect_block = indirect_block_lock.as_mut_ref::<IndirectBlock>(0);
 
@@ -447,7 +447,7 @@ impl DiskInode {
         block_device: &Arc<dyn BlockDevice>,
     ) -> Vec<u32> {
         // get cur nodes
-        let mut cache = get_block_cache(block_id as usize, Arc::clone(block_device));
+        let cache = get_block_cache(block_id as usize, Arc::clone(block_device));
         let mut indirect_block_lock = cache.lock();
         let indirect_block = indirect_block_lock.as_mut_ref::<IndirectBlock>(0);
 
@@ -509,7 +509,7 @@ impl DirEntry {
     }
     pub fn new(name: &str, inode_id: u32) -> Self {
         let mut new_name = [0u8; MAX_NAME_LENGTH + 1];
-        &mut new_name[..name.len()].copy_from_slice(name.as_bytes());
+        let _ = &mut new_name[..name.len()].copy_from_slice(name.as_bytes());
         Self {
             name: new_name,
             inode_id,

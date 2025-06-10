@@ -10,11 +10,14 @@ use crate::proc::proc_ctx::ProcContext;
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use alloc::collections::BTreeMap;
+use alloc::format;
+use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
 use core::cell::RefMut;
 use lazy_static::lazy_static;
+use crate::println;
 
 #[derive(Debug)]
 pub enum ProcessState {
@@ -115,12 +118,41 @@ impl ProcessControlBlock {
         parent_inner.children.push(Arc::clone(&pcb));
         pcb
     }
-    pub fn exec(&self, data: &[u8]) {
-        let mm = MemoryManager::from_elf(data);
+    pub fn exec(&self, data: &[u8], args: Vec<String>) {
+        // println!("exec: pid {}, args: {:?}", self.getpid(), args);
+        let mut mm = MemoryManager::from_elf(data);
         let trap_ctx_ppn = mm
             .page_table
             .find_ppn(VirtAddr::from(TRAP_CONTEXT).into())
             .unwrap();
+
+        // push args to user stack
+
+        // prepare argv
+        mm.user_stack_top -= (args.len() + 1) * core::mem::size_of::<usize>();
+        let argv_base = mm.user_stack_top;
+
+        // null terminator for argv
+        mm.write(
+            VirtAddr::from(argv_base + args.len() * core::mem::size_of::<usize>()),
+            &[0u8; core::mem::size_of::<usize>()],
+        );
+
+        for i in 0..args.len() {
+            mm.user_stack_top -= args[i].len() + 1;
+            mm.write(
+                VirtAddr::from(argv_base + i * core::mem::size_of::<usize>()),
+                mm.user_stack_top.to_le_bytes().as_slice(),
+            );
+            mm.write(
+                VirtAddr::from(mm.user_stack_top),
+                args[i].as_bytes().iter().chain(&[0u8]).copied().collect::<Vec<u8>>().as_slice(),
+            );
+        }
+
+        // align to 8 bytes
+        mm.user_stack_top -= mm.user_stack_top % core::mem::size_of::<usize>();
+
         let mut inner = self.exclusive_access();
         // abandon old virtual space and take new one, so just substitute
         inner.mm = mm;
@@ -135,6 +167,9 @@ impl ProcessControlBlock {
             KERNEL_MM.exclusive_access().page_table.token(),
             kernel_stack_top,
         );
+        trap_ctx.x[10] = args.len();
+        trap_ctx.x[11] = argv_base;
+
     }
     pub fn is_zombie(&self) -> bool {
         match self.inner.exclusive_access().state {

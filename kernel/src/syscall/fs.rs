@@ -4,6 +4,7 @@ use crate::fs::pipe::make_pipe_pair;
 use crate::mm::VirtAddr;
 use crate::proc::get_cur_proc;
 use alloc::vec::Vec;
+use crate::println;
 
 /// write buf of length `len`  to a file with `fd`
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
@@ -47,6 +48,7 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
     let cur_proc = get_cur_proc().unwrap();
     let mut inner = cur_proc.exclusive_access();
     let path = inner.mm.read_str(VirtAddr::from(path as usize));
+    println!("sys_open: path = {}, flags = {}", path, flags);
     if let Some(file) = KernelFile::from_path(path.as_str(), OpenFlags::from_bits(flags).unwrap()) {
         inner.fd_table.insert_file(file)
     } else {

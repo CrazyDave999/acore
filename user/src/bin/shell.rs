@@ -60,7 +60,7 @@ impl Display for State {
     }
 }
 
-pub fn print_pwd(state: &State, pwd: &Path) {
+fn print_pwd(state: &State, pwd: &Path) {
     match state {
         State::Good => {
             info!("{} {}$ ", state, pwd);
@@ -72,7 +72,7 @@ pub fn print_pwd(state: &State, pwd: &Path) {
 }
 
 #[no_mangle]
-pub fn main() -> i32 {
+pub fn main(_argc: usize, _argv: &[&str]) -> i32 {
     println!("[shell] This is CrazyDave shell.");
     let mut line: String = String::new();
     let pwd = Path::new();
@@ -85,18 +85,22 @@ pub fn main() -> i32 {
             LF | CR => {
                 println!("");
                 if !line.is_empty() {
-                    // file name
-                    line.push('\0');
+                    let args: Vec<&str> = line.as_str().split(' ').collect();
+                    let args_copy: Vec<String> = args.iter().enumerate().map(|(i, &arg)|{
+                        if i == 0 && !arg.starts_with('/') {
+                            // modify relative path to absolute path
+                            format!("{}{}\0", pwd, arg)
+                        }else {
+                            format!("{}\0", arg)
+                        }
+                    }).collect();
+                    let mut args_addr: Vec<*const u8> = args_copy.iter().map(|arg| arg.as_ptr()).collect();
+                    args_addr.push(0 as *const u8); // null-terminate the args
 
                     let pid = fork();
                     if pid == 0 {
                         // child process
-                        let abs_path = if line.starts_with('/') {
-                            line
-                        } else {
-                            format!("{}{}", pwd, line)
-                        };
-                        if exec(abs_path.as_str()) == -1 {
+                        if exec(args_copy[0].as_str(), args_addr.as_slice()) == -1 {
                             println!("[shell] Error when executing!");
                             return -4;
                         }
