@@ -12,6 +12,7 @@ const SYSCALL_FORK: usize = 220;
 const SYSCALL_EXEC: usize = 221;
 const SYSCALL_WAITPID: usize = 260;
 const SYSCALL_SHUTDOWN: usize = 9999;
+const SYSCALL_PIPE: usize = 59;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret: isize;
@@ -78,5 +79,7 @@ pub fn sys_shutdown() -> isize {
     syscall(SYSCALL_SHUTDOWN, [0, 0, 0])
 }
 
-
+pub fn sys_pipe(pipe: &mut [usize]) -> isize {
+    syscall(SYSCALL_PIPE, [pipe.as_mut_ptr() as usize, 0, 0])
+}
 

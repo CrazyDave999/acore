@@ -1,5 +1,6 @@
 pub mod kernel_file;
 pub mod stdio;
+pub mod pipe;
 
 pub trait File: Send + Sync {
     fn readable(&self) -> bool;

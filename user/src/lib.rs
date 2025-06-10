@@ -6,8 +6,8 @@
 #[macro_use]
 pub mod console;
 mod lang_items;
-pub mod syscall;
 mod logging;
+pub mod syscall;
 
 use bitflags::bitflags;
 // use buddy_system_allocator::LockedHeap;
@@ -40,7 +40,9 @@ fn main() -> i32 {
 
 fn init() {
     unsafe {
-        USER_HEAP.borrow_mut().init(USER_HEAP_SPACE.as_ptr() as usize, USER_HEAP_SIZE);
+        USER_HEAP
+            .borrow_mut()
+            .init(USER_HEAP_SPACE.as_ptr() as usize, USER_HEAP_SIZE);
         // HEAP.lock().init(USER_HEAP_SPACE.as_ptr() as usize, USER_HEAP_SIZE);
     }
     logging::init();
@@ -118,5 +120,6 @@ pub fn sleep(time_ms: usize) {
     }
 }
 
-
-
+pub fn pipe(pipe_fd: &mut [usize]) -> isize {
+    sys_pipe(pipe_fd)
+}

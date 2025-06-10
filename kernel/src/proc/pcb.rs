@@ -107,7 +107,7 @@ impl ProcessControlBlock {
                     children: Vec::new(),
                     exit_code: 0,
                     mm,
-                    fd_table: FileDescriptorTable::new(),
+                    fd_table: parent_inner.fd_table.clone(),
                 })
             },
         });
@@ -182,15 +182,22 @@ impl FileDescriptorTable {
             recycled: Vec::new(),
         }
     }
-    pub fn insert_kernel_file(&mut self, kernel_file: Arc<KernelFile>) -> isize {
+    pub fn clone(&self) -> Self {
+        FileDescriptorTable {
+            fd_table: self.fd_table.clone(),
+            recycled: self.recycled.clone(),
+        }
+    }
+    pub fn insert_file(&mut self, file: Arc<dyn File + Send + Sync>) -> isize {
         let fd = if let Some(fd) = self.recycled.pop() {
             fd
         } else {
             self.fd_table.len()
         };
-        self.fd_table.insert(fd, kernel_file);
+        self.fd_table.insert(fd, file);
         fd as isize
     }
+
     pub fn dealloc_fd(&mut self, fd: usize) -> isize {
         if let Some(_) = self.fd_table.remove(&fd) {
             self.recycled.push(fd);
