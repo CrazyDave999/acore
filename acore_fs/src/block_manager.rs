@@ -1,20 +1,21 @@
+use alloc::collections::VecDeque;
 use crate::block_cache::BlockCache;
 use crate::block_dev::BlockDevice;
 use alloc::sync::Arc;
-use core::num::NonZeroUsize;
+
 use lazy_static::lazy_static;
-use lru::LruCache;
+
 use spin::Mutex;
 
 pub const BLOCK_CACHE_CAP: usize = 16;
 pub struct BlockManager {
-    lru_cache: LruCache<usize, Arc<Mutex<BlockCache>>>,
+    queue: VecDeque<(usize, Arc<Mutex<BlockCache>>)>,
 }
 
 impl BlockManager {
     pub fn new() -> Self {
         BlockManager {
-            lru_cache: LruCache::new(NonZeroUsize::try_from(BLOCK_CACHE_CAP).unwrap()),
+            queue: VecDeque::new(),
         }
     }
     /// Get a block cache from the block device. Load it from disk if not in cache.
@@ -23,20 +24,18 @@ impl BlockManager {
         block_id: usize,
         block_device: Arc<dyn BlockDevice>,
     ) -> Arc<Mutex<BlockCache>> {
-        if let Some(cache) = self.lru_cache.get(&block_id) {
+        if let Some((_, cache)) = self.queue.iter().find(|(id,_)| *id == block_id) {
             cache.clone()
         } else {
-            if self.lru_cache.len() == BLOCK_CACHE_CAP {
+            if self.queue.len() == BLOCK_CACHE_CAP {
                 // evict
-                let id = self.lru_cache.iter().rev().find_map(|(id, cache)| {
-                    if Arc::strong_count(cache) == 1 {
-                        Some(*id)
-                    } else {
-                        None
-                    }
-                });
-                if let Some(id) = id {
-                    self.lru_cache.pop(&id);
+                if let Some((idx, _)) = self
+                    .queue
+                    .iter()
+                    .enumerate()
+                    .find(|(_, (_, cache))| Arc::strong_count(cache) == 1)
+                {
+                    self.queue.drain(idx..=idx);
                 } else {
                     panic!("Run out of BlockCache!");
                 }
@@ -45,7 +44,7 @@ impl BlockManager {
                 block_id,
                 Arc::clone(&block_device),
             )));
-            self.lru_cache.put(block_id, Arc::clone(&cache));
+            self.queue.push_back((block_id, Arc::clone(&cache)));
             cache
         }
     }
@@ -66,7 +65,7 @@ pub fn get_block_cache(
 /// Sync all block caches to disk
 pub fn sync_all () {
     let block_manager = BLOCK_MANAGER.lock();
-    for (_, cache) in block_manager.lru_cache.iter() {
+    for (_, cache) in block_manager.queue.iter() {
         cache.lock().sync();
     }
 }

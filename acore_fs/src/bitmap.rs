@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use alloc::sync::Arc;
 use crate::block_dev::BlockDevice;
 use crate::block_manager::get_block_cache;
 use crate::BLOCK_SIZE;

@@ -1,9 +1,10 @@
+use alloc::string::String;
 use crate::afs::AcoreFileSystem;
 use crate::block_dev::BlockDevice;
 use crate::block_manager::{get_block_cache, sync_all};
 use crate::layout::{DirEntry, DiskInode, DiskInodeType, DIR_ENTRY_SIZE};
 use alloc::sync::Arc;
-
+use alloc::vec::Vec;
 use spin::{Mutex, MutexGuard};
 
 /// for sys service related to file system
@@ -93,18 +94,18 @@ impl Inode {
             // create a new file
             let mut fs = self.fs.lock();
 
-            println!("access_dir_entry. got fs lock");
+            // println!("access_dir_entry. got fs lock");
 
             let new_inode_id = fs.alloc_inode_block();
             let (new_block_id, new_block_offset) = fs.get_disk_inode_pos(new_inode_id);
 
-            println!("new_block_id: {}, new_block_offset: {}", new_block_id, new_block_offset);
+            // println!("new_block_id: {}, new_block_offset: {}", new_block_id, new_block_offset);
 
             let cache = get_block_cache(new_block_id as usize, Arc::clone(&self.block_device));
             let mut new_disk_inode_lock = cache.lock();
             let new_disk_inode = new_disk_inode_lock.as_mut_ref::<DiskInode>(new_block_offset);
 
-            println!("access_dir_entry. got new cache");
+            // println!("access_dir_entry. got new cache");
 
             new_disk_inode.init(type_);
 

@@ -2,11 +2,12 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::bitflags;
 use lazy_static::lazy_static;
-use acore_fs::{DiskInodeType, Inode};
+use acore_fs::{DiskInodeType, Inode, BLOCK_SIZE};
 use crate::fs::File;
 use crate::sync::UPSafeCell;
 use acore_fs::AcoreFileSystem;
 use crate::drivers::BLOCK_DEVICE;
+use crate::println;
 
 bitflags! {
     ///Open file flags
@@ -56,8 +57,27 @@ impl KernelFile {
             inner: unsafe { UPSafeCell::new(KernelFileInner { offset: 0, inode }) },
         }
     }
+
+    /// Read all data from the kernel file into a vector
+    pub fn read_all(&self) -> Vec<u8> {
+        let mut inner = self.inner.exclusive_access();
+        let mut buf = [0u8; BLOCK_SIZE];
+        let mut v = Vec::new();
+        loop {
+            let len = inner.inode.read_at(inner.offset, &mut buf);
+            if len == 0 {
+                break;
+            }
+            inner.offset += len;
+            v.extend_from_slice(&buf[..len]);
+        }
+        v
+    }
     pub fn from_path(path: &str, flags: OpenFlags) -> Option<Arc<Self>> {
-        let mut path = path.split('/').collect::<Vec<_>>();
+        let mut path = path.split('/').skip(1).collect::<Vec<_>>();
+
+        // println!("{:?}", path);
+
         let file_name = path.pop().unwrap();
         let mut inode = ROOT.clone();
         for dir_entry in path {
@@ -113,4 +133,12 @@ lazy_static!{
         let afs = AcoreFileSystem::open(BLOCK_DEVICE.clone());
         AcoreFileSystem::root_inode(afs)
     };
+}
+
+pub fn list_apps() {
+    println!("===== ROOT ======");
+    for name in ROOT.ls() {
+        println!("{}", name);
+    }
+    println!("==================");
 }

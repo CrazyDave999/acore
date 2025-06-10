@@ -60,7 +60,7 @@ impl AcoreFileSystem {
             data_block.clear();
         }
 
-        println!("All blocks cleared");
+        // println!("All blocks cleared");
 
         // initialize SuperBlock
         let cache = get_block_cache(0, Arc::clone(&block_device));
@@ -78,12 +78,12 @@ impl AcoreFileSystem {
         drop(cache);
 
 
-        println!("SuperBlock initialized");
+        // println!("SuperBlock initialized");
 
         // create root inode
         assert_eq!(afs.alloc_inode_block(), 0);
         let (root_block_id, root_block_offset) = afs.get_disk_inode_pos(0);
-        eprintln!("root_block_id: {}", root_block_id);
+        // println!("root_block_id: {}", root_block_id);
 
         let cache = get_block_cache(root_block_id as usize, Arc::clone(&block_device));
         let mut root_disk_inode_lock = cache.lock();
@@ -94,7 +94,7 @@ impl AcoreFileSystem {
         drop(root_disk_inode_lock);
         drop(cache);
 
-        println!("Root inode initialized");
+        // println!("Root inode initialized");
 
         sync_all();
 

@@ -9,7 +9,6 @@ edition = "2021"
 spin = "0.7.0"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 buddy = { path = "../buddy" }
-lru = { version = "0.14.0", default-features = false }
 
 [profile.release]
 debug = true

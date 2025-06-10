@@ -1,11 +1,11 @@
-use crate::mm::get_app_data_by_name;
 use crate::mm::PageTable;
 use crate::proc::{exit_proc, get_cur_proc, get_cur_user_token, push_proc, switch_proc};
 use crate::timer::{get_time_ms};
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use crate::console::shutdown;
-
+use crate::fs::File;
+use crate::fs::kernel_file::{KernelFile, OpenFlags};
 
 pub fn sys_exit(exit_code: i32) -> ! {
     // println!("[kernel] sys_exit: pid: {}", sys_getpid());
@@ -44,8 +44,18 @@ pub fn sys_exec(path: *const u8) -> isize {
     let page_table = PageTable::from_token(token);
     let path = page_table.find_str((path as usize).into());
     // println!("path: {}", path);
-    if let Some(data) = get_app_data_by_name(path.as_str()) {
-        get_cur_proc().unwrap().exec(data);
+
+    // if let Some(data) = get_app_data_by_name(path.as_str()) {
+    //     get_cur_proc().unwrap().exec(data);
+    //     0
+    // } else {
+    //     -1
+    // }
+
+    if let Some(app_kernel_file) = KernelFile::from_path(path.as_str(), OpenFlags::RDONLY) {
+        let all_data = app_kernel_file.read_all();
+        let proc = get_cur_proc().unwrap();
+        proc.exec(all_data.as_slice());
         0
     } else {
         -1

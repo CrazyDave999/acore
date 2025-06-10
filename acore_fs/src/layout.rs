@@ -1,6 +1,7 @@
 use crate::block_manager::get_block_cache;
 use crate::{BlockDevice, BLOCK_SIZE};
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::cmp::min;
 
 const AFS_MAGIC_NUM: u32 = 0x114514;
@@ -126,7 +127,9 @@ impl DiskInode {
     ) -> usize {
         let mut start = offset;
         let end = min(offset + buf.len(), self.size as usize);
-        assert!(end > start);
+        if start >= end {
+            return 0;
+        }
         let mut start_inner_block_id = start / BLOCK_SIZE;
         let mut read_size = 0usize;
         loop {

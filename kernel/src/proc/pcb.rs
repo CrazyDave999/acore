@@ -1,8 +1,8 @@
 use crate::config::TRAP_CONTEXT;
-use crate::fs::kernel_file::KernelFile;
+use crate::fs::kernel_file::{KernelFile, OpenFlags};
 use crate::fs::stdio::{Stdin, Stdout};
 use crate::fs::File;
-use crate::mm::{get_app_data_by_name, get_kernel_stack_info, KERNEL_MM};
+use crate::mm::{get_kernel_stack_info, KERNEL_MM};
 use crate::mm::{init_kernel_stack, release_kernel_stack, VirtAddr};
 use crate::mm::{MemoryManager, PhysPageNum};
 use crate::proc::pid::{pid_alloc, PIDGuard};
@@ -160,9 +160,11 @@ impl ProcessControlBlockInner {
 }
 
 lazy_static! {
-    pub static ref INIT_PCB: Arc<ProcessControlBlock> = Arc::new(ProcessControlBlock::from_elf(
-        get_app_data_by_name("init").unwrap()
-    ));
+    pub static ref INIT_PCB: Arc<ProcessControlBlock> = Arc::new({
+        let kernel_file = KernelFile::from_path("/init", OpenFlags::RDONLY).unwrap();
+        let v = kernel_file.read_all();
+        ProcessControlBlock::from_elf(v.as_slice())
+    });
 }
 
 pub struct FileDescriptorTable {
