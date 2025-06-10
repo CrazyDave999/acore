@@ -2,7 +2,7 @@ use crate::console::shutdown;
 use crate::fs::kernel_file::{KernelFile, OpenFlags};
 use crate::fs::File;
 use crate::mm::{PageTable, VirtAddr};
-use crate::proc::{exit_proc, get_cur_proc, get_cur_user_token, push_proc, switch_proc};
+use crate::proc::{exit_proc, get_cur_proc, get_cur_user_token, pid2pcb, push_proc, switch_proc, SignalAction, SignalFlags, MAX_SIG};
 use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
 use alloc::string::String;
@@ -111,3 +111,93 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
 pub fn sys_shutdown() -> ! {
     shutdown();
 }
+pub fn sys_kill(pid: usize, signum: i32) -> isize {
+    if let Some(pcb) = pid2pcb(pid) {
+        if let Some(flag) = SignalFlags::from_bits(1 << signum) {
+            let mut inner = pcb.exclusive_access();
+            if inner.signals.contains(flag) {
+                return -1;
+            }
+            inner.signals.insert(flag);
+            0
+        } else {
+            -1
+        }
+    } else {
+        -1
+    }
+}
+
+pub fn sys_sigprocmask(mask: u32) -> isize {
+    if let Some(proc) = get_cur_proc() {
+        let mut inner = proc.exclusive_access();
+        let old_mask = inner.signal_mask;
+        if let Some(flag) = SignalFlags::from_bits(mask) {
+            inner.signal_mask = flag;
+            old_mask.bits() as isize
+        } else {
+            -1
+        }
+    } else {
+        -1
+    }
+}
+
+pub fn sys_sigreturn() -> isize {
+    if let Some(proc) = get_cur_proc() {
+        let mut inner = proc.exclusive_access();
+        inner.handling_sig = -1;
+        // restore the trap context
+        let trap_ctx = inner.trap_ctx_ppn.get_mut();
+        *trap_ctx = inner.trap_ctx_backup.unwrap();
+        // Here we return the value of a0 in the trap_ctx,
+        // otherwise it will be overwritten after we trap
+        // back to the original execution of the application.
+        trap_ctx.x[10] as isize
+    } else {
+        -1
+    }
+}
+
+fn check_sigaction_error(signal: SignalFlags, action: usize, old_action: usize) -> bool {
+    if action == 0
+        || old_action == 0
+        || signal == SignalFlags::SIGKILL
+        || signal == SignalFlags::SIGSTOP
+    {
+        true
+    } else {
+        false
+    }
+}
+
+pub fn sys_sigaction(
+    signum: i32,
+    action: *const SignalAction,
+    old_action: *mut SignalAction,
+) -> isize {
+    let cur_proc = get_cur_proc().unwrap();
+    let mut inner = cur_proc.exclusive_access();
+    if signum as usize > MAX_SIG {
+        return -1;
+    }
+    if let Some(flag) = SignalFlags::from_bits(1 << signum) {
+        if check_sigaction_error(flag, action as usize, old_action as usize) {
+            return -1;
+        }
+        let prev_action = inner.signal_actions.table[signum as usize];
+        // *translated_refmut(token, old_action) = prev_action;
+        unsafe {
+            *(inner.mm.page_table.find_pa(
+                VirtAddr::from(old_action as usize)).unwrap().0 as *mut SignalAction) = prev_action;
+        }
+        inner.signal_actions.table[signum as usize] = unsafe {
+            *(inner.mm.page_table.find_pa(
+                VirtAddr::from(action as usize)).unwrap().0 as *const SignalAction)
+        };
+        0
+    } else {
+        -1
+    }
+}
+

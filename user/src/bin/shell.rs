@@ -13,7 +13,7 @@ const DL: u8 = 0x7fu8;
 const BS: u8 = 0x08u8;
 
 use alloc::format;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt::Display;
 use log::{error, info};

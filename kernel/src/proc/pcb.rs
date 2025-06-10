@@ -16,6 +16,8 @@ use alloc::sync::Weak;
 use alloc::vec::Vec;
 use core::cell::RefMut;
 use lazy_static::lazy_static;
+use crate::proc::action::SignalActions;
+use crate::proc::SignalFlags;
 
 #[derive(Debug)]
 pub enum ProcessState {
@@ -39,6 +41,17 @@ pub struct ProcessControlBlockInner {
     pub exit_code: i32,
     pub mm: MemoryManager,
     pub fd_table: FileDescriptorTable,
+    pub signals: SignalFlags,
+    pub signal_mask: SignalFlags,
+    // the signal which is being handling
+    pub handling_sig: isize,
+    // Signal actions
+    pub signal_actions: SignalActions,
+    // if the task is killed
+    pub killed: bool,
+    // if the task is frozen by a signal
+    pub frozen: bool,
+    pub trap_ctx_backup: Option<TrapContext>,
 }
 
 impl ProcessControlBlock {
@@ -69,6 +82,13 @@ impl ProcessControlBlock {
             exit_code: 0,
             mm,
             fd_table: FileDescriptorTable::new(),
+            signals: SignalFlags::empty(),
+            signal_mask: SignalFlags::empty(),
+            handling_sig: -1,
+            signal_actions: SignalActions::default(),
+            killed: false,
+            frozen: false,
+            trap_ctx_backup: None,
         };
 
         ProcessControlBlock {
@@ -109,6 +129,14 @@ impl ProcessControlBlock {
                     exit_code: 0,
                     mm,
                     fd_table: parent_inner.fd_table.clone(),
+                    signals: SignalFlags::empty(),
+                    // inherit parent's signal mask and signal actions
+                    signal_mask: parent_inner.signal_mask,
+                    handling_sig: -1,
+                    signal_actions: parent_inner.signal_actions.clone(),
+                    killed: false,
+                    frozen: false,
+                    trap_ctx_backup: None,
                 })
             },
         });

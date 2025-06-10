@@ -1,4 +1,5 @@
 use super::pcb::{ProcessControlBlock, ProcessState};
+use alloc::collections::BTreeMap;
 
 use crate::proc::scheduler::Scheduler;
 
@@ -15,6 +16,7 @@ use lazy_static::lazy_static;
 pub struct ProcessManager {
     cur: Option<Arc<ProcessControlBlock>>,
     scheduler: Scheduler,
+    pid2pcb: BTreeMap<usize, Arc<ProcessControlBlock>>,
 }
 
 impl ProcessManager {
@@ -23,6 +25,7 @@ impl ProcessManager {
             cur: None,
             // procs: Vec::new(),
             scheduler: Scheduler::new(),
+            pid2pcb: BTreeMap::new(),
         }
     }
 }
@@ -72,11 +75,11 @@ pub fn switch_proc() {
             // );
             let mut next_inner = next_proc.exclusive_access();
             next_inner.state = ProcessState::Running;
-            let next_proc_ctx:*mut ProcContext = &mut next_inner.proc_ctx as *mut _;
+            let next_proc_ctx: *mut ProcContext = &mut next_inner.proc_ctx as *mut _;
 
             let mut cur_inner = cur_proc.exclusive_access();
             cur_inner.state = ProcessState::Ready;
-            let cur_proc_ctx:*mut ProcContext = &mut cur_inner.proc_ctx as *mut _;
+            let cur_proc_ctx: *mut ProcContext = &mut cur_inner.proc_ctx as *mut _;
 
             drop(next_inner);
             drop(cur_inner);
@@ -94,7 +97,7 @@ pub fn switch_proc() {
             unsafe {
                 __switch(cur_proc_ctx, next_proc_ctx);
             }
-            return
+            return;
         } else {
             // println!("3 next_pid: {:?}", next_proc.getpid());
             // no current process, just switch to next
@@ -108,8 +111,10 @@ pub fn switch_proc() {
             inner.cur = Some(next_proc);
             drop(inner);
             // println!("going to switch");
-            unsafe { __switch(unused_proc_ctx, next_proc_ctx); }
-            return
+            unsafe {
+                __switch(unused_proc_ctx, next_proc_ctx);
+            }
+            return;
         }
     }
     // no other ready proc, do nothing
@@ -124,6 +129,10 @@ pub fn exit_proc(exit_code: i32) {
         println!("[kernel] Goodbye! exit code: {}", exit_code);
         shutdown();
     }
+
+    // remove from pid2pcb
+    remove_from_pid2pcb(pid);
+
     // cur_proc is not init
     let mut inner = cur_proc.exclusive_access();
     inner.state = ProcessState::Zombie;
@@ -151,10 +160,11 @@ pub fn exit_proc(exit_code: i32) {
 /// Push a newly created process to the scheduler's ready queue.
 pub fn push_proc(proc: Arc<ProcessControlBlock>) {
     let mut inner = PROC_MANAGER.exclusive_access();
-    inner.scheduler.push(proc);
+    inner.scheduler.push(Arc::clone(&proc));
+    inner.pid2pcb.insert(proc.getpid(), Arc::clone(&proc));
 }
 
-pub fn launch(proc: Arc<ProcessControlBlock>){
+pub fn launch(proc: Arc<ProcessControlBlock>) {
     println!("[kernel] Launching proc: {:?}", proc.getpid());
     let mut inner = PROC_MANAGER.exclusive_access();
     inner.cur = Some(proc);
@@ -168,5 +178,21 @@ pub fn launch(proc: Arc<ProcessControlBlock>){
     drop(cur_proc);
     unsafe {
         __switch(unused_proc_ctx, cur_proc_ctx);
+    }
+}
+
+pub fn pid2pcb(pid: usize) -> Option<Arc<ProcessControlBlock>> {
+    let inner = PROC_MANAGER.exclusive_access();
+    inner.pid2pcb.get(&pid).cloned()
+}
+
+pub fn remove_from_pid2pcb(pid: usize) {
+    if PROC_MANAGER
+        .exclusive_access()
+        .pid2pcb
+        .remove(&pid)
+        .is_none()
+    {
+        panic!("remove_from_pid2pcb: pid {} not found", pid);
     }
 }

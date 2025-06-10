@@ -3,7 +3,7 @@ mod context;
 use crate::syscall::syscall;
 
 use crate::config::*;
-use crate::proc::{exit_proc, get_cur_trap_ctx, get_cur_user_token, switch_proc};
+use crate::proc::{check_signals_error_of_current, current_add_signal, exit_proc, get_cur_trap_ctx, get_cur_user_token, handle_signals, switch_proc, SignalFlags};
 use core::arch::{asm, global_asm};
 use log::error;
 use riscv::register::{
@@ -71,16 +71,18 @@ pub fn trap_handler() -> ! {
         | Trap::Exception(Exception::StorePageFault)
         | Trap::Exception(Exception::LoadFault)
         | Trap::Exception(Exception::LoadPageFault) => {
-            error!(
-                "[kernel] PageFault, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it\
-                .\n",
-                stval, ctx.sepc
-            );
-            exit_proc(-2);
+            // error!(
+            //     "[kernel] PageFault, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it\
+            //     .\n",
+            //     stval, ctx.sepc
+            // );
+            // exit_proc(-2);
+            current_add_signal(SignalFlags::SIGSEGV);
         }
         Trap::Exception(Exception::IllegalInstruction) => {
-            error!("IllegalInstruction in application\n");
-            exit_proc(-3);
+            // error!("IllegalInstruction in application\n");
+            // exit_proc(-3);
+            current_add_signal(SignalFlags::SIGILL);
         }
         _ => {
             panic!(
@@ -90,6 +92,14 @@ pub fn trap_handler() -> ! {
             );
         }
     }
+
+    handle_signals();
+
+    if let Some((errno, msg)) = check_signals_error_of_current() {
+        println!("[kernel] {}", msg);
+        exit_proc(errno);
+    }
+
     trap_return()
 }
 
@@ -127,3 +137,4 @@ pub fn trap_from_kernel() -> ! {
 
 use crate::timer::set_next_trigger;
 pub use context::TrapContext;
+use crate::println;

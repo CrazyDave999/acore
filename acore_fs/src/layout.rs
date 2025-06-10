@@ -493,12 +493,12 @@ pub struct DirEntry {
 
 /// should be 32 bytes
 pub const DIR_ENTRY_SIZE: usize = core::mem::size_of::<DirEntry>();
-pub const DIR_ENTRY_NUM: usize = BLOCK_SIZE / DIR_ENTRY_SIZE;
+// pub const DIR_ENTRY_NUM: usize = BLOCK_SIZE / DIR_ENTRY_SIZE;
 
 /// should be BLOCK_SIZE bytes
 // pub type DirEntryBlock = [DirEntry; DIR_ENTRY_NUM];
-#[repr(C)]
-pub struct DirEntryBlock(pub [DirEntry; DIR_ENTRY_NUM]);
+// #[repr(C)]
+// pub struct DirEntryBlock(pub [DirEntry; DIR_ENTRY_NUM]);
 
 impl DirEntry {
     pub fn empty() -> Self {

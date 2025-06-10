@@ -20,7 +20,7 @@ impl File for Stdin {
         }
         1
     }
-    fn write(&self, buf: &[u8]) -> usize {
+    fn write(&self, _buf: &[u8]) -> usize {
         panic!("WTF? Cannot write to stdin!");
     }
     /// do nothing
