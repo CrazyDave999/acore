@@ -18,7 +18,7 @@ use alloc::vec::Vec;
 use core::fmt::Display;
 use log::{error, info};
 use user_lib::console::getchar;
-use user_lib::{exec, fork, waitpid};
+use user_lib::{close, dup, exec, fork, open, waitpid, OpenFlags};
 
 enum State {
     Good,
@@ -86,21 +86,74 @@ pub fn main(_argc: usize, _argv: &[&str]) -> i32 {
                 println!("");
                 if !line.is_empty() {
                     let args: Vec<&str> = line.as_str().split(' ').collect();
-                    let args_copy: Vec<String> = args.iter().enumerate().map(|(i, &arg)|{
-                        if i == 0 && !arg.starts_with('/') {
-                            // modify relative path to absolute path
-                            format!("{}{}\0", pwd, arg)
-                        }else {
-                            format!("{}\0", arg)
-                        }
-                    }).collect();
+                    let mut args_copy: Vec<String> = args
+                        .iter()
+                        .enumerate()
+                        .map(|(i, &arg)| {
+                            if i == 0 && !arg.starts_with('/') {
+                                // modify relative path to absolute path
+                                format!("{}{}\0", pwd, arg)
+                            } else {
+                                format!("{}\0", arg)
+                            }
+                        })
+                        .collect();
 
-                    let mut args_addr: Vec<*const u8> = args_copy.iter().map(|arg| arg.as_ptr()).collect();
+                    // redirect input
+                    let mut input = String::new();
+                    if let Some((idx, _)) = args_copy
+                        .iter()
+                        .enumerate()
+                        .find(|(_, arg)| arg.as_str() == "<\0")
+                    {
+                        input = args_copy[idx + 1].clone();
+                        args_copy.drain(idx..=idx + 1);
+                    }
+
+                    // redirect output
+                    let mut output = String::new();
+                    if let Some((idx, _)) = args_copy
+                        .iter()
+                        .enumerate()
+                        .find(|(_, arg)| arg.as_str() == ">\0")
+                    {
+                        output = args_copy[idx + 1].clone();
+                        args_copy.drain(idx..=idx + 1);
+                    }
+
+                    let mut args_addr: Vec<*const u8> =
+                        args_copy.iter().map(|arg| arg.as_ptr()).collect();
                     args_addr.push(0 as *const u8); // null-terminate the args
 
                     let pid = fork();
                     if pid == 0 {
                         // child process
+
+                        if !input.is_empty() {
+                            // redirect input
+                            let input_fd = open(input.as_str(), OpenFlags::RDONLY);
+                            if input_fd < 0 {
+                                println!("[shell] Error opening input file: {}", input);
+                                return -4;
+                            }
+                            close(0);
+                            assert_eq!(dup(input_fd as usize), 0);
+                            close(input_fd as usize);
+                        }
+
+                        if !output.is_empty() {
+                            // redirect output
+                            let output_fd =
+                                open(output.as_str(), OpenFlags::CREATE | OpenFlags::WRONLY);
+                            if output_fd < 0 {
+                                println!("[shell] Error opening output file: {}", output);
+                                return -4;
+                            }
+                            close(1);
+                            assert_eq!(dup(output_fd as usize), 1);
+                            close(output_fd as usize);
+                        }
+
                         if exec(args_copy[0].as_str(), args_addr.as_slice()) == -1 {
                             println!("[shell] Error when executing!");
                             return -4;

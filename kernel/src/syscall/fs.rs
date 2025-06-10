@@ -1,6 +1,6 @@
 //! File and filesystem-related syscalls
 use crate::fs::kernel_file::{KernelFile, OpenFlags};
-use crate::fs::pipe::make_pipe_pair;
+use crate::fs::pipe::{make_pipe_pair, Pipe};
 use crate::mm::VirtAddr;
 use crate::proc::get_cur_proc;
 use alloc::vec::Vec;
@@ -75,4 +75,14 @@ pub fn sys_pipe(pipe: *mut usize) -> isize {
         core::slice::from_raw_parts(data.as_ptr() as *const u8, byte_len)
     });
     0
+}
+
+pub fn sys_dup(fd: usize) -> isize {
+    let cur_proc = get_cur_proc().unwrap();
+    let mut inner = cur_proc.exclusive_access();
+    if let Some(file) = inner.get_file(fd) {
+        inner.fd_table.insert_file(file.clone())
+    } else {
+        -1
+    }
 }

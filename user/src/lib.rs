@@ -78,6 +78,9 @@ bitflags! {
         const TRUNC = 1 << 10;
     }
 }
+pub fn dup(fd: usize) -> isize {
+    sys_dup(fd)
+}
 pub fn open(path: &str, flags: OpenFlags) -> isize {
     sys_open(path, flags.bits)
 }
