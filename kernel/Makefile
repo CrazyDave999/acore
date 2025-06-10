@@ -22,7 +22,7 @@ OBJCOPY := rust-objcopy --binary-architecture=riscv64
 # Disassembly
 DISASM ?= -x
 
-build: env $(KERNEL_BIN)
+build: env $(KERNEL_BIN) fs-img
 
 env:
 	(rustup target list | grep "riscv64gc-unknown-none-elf (installed)") || rustup target add $(TARGET)
