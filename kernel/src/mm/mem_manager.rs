@@ -53,7 +53,7 @@ pub struct MemoryManager {
 
     pub entry_point: usize,
 
-    pub user_stack_top: usize,
+    pub user_stack_bottom: usize,
 }
 
 /// A continuous memory region, with same flags
@@ -90,7 +90,7 @@ impl MemoryManager {
             page_table: PageTable::empty(),
             areas: BTreeMap::new(),
             entry_point: 0,
-            user_stack_top: 0,
+            user_stack_bottom: 0,
         }
     }
 
@@ -235,25 +235,8 @@ impl MemoryManager {
         }
         // align end_of_elf_data
         let user_stack_bottom: usize = VirtAddr::from(max_end_va.ceil()).0 + PAGE_SIZE;
-        let user_stack_top: usize = user_stack_bottom + USER_STACK_SIZE;
-        // println!("[kernel] user stack, ");
-        // user stack
-        mm.insert_area(
-            user_stack_bottom.into(),
-            user_stack_top.into(),
-            MapType::Framed,
-            MapPerm::R | MapPerm::W | MapPerm::U,
-            None,
-        );
-        // trap context
-        mm.insert_area(
-            TRAP_CONTEXT.into(),
-            TRAMPOLINE.into(),
-            MapType::Framed,
-            MapPerm::R | MapPerm::W,
-            None,
-        );
-        mm.user_stack_top = user_stack_top;
+
+        mm.user_stack_bottom = user_stack_bottom;
         mm.entry_point = elf.header.pt2.entry_point() as usize;
         mm
     }
@@ -262,7 +245,7 @@ impl MemoryManager {
     pub fn from_existed(another_mm: &Self) -> Self {
         let mut mm = MemoryManager::empty();
         mm.entry_point = another_mm.entry_point;
-        mm.user_stack_top = another_mm.user_stack_top;
+        mm.user_stack_bottom = another_mm.user_stack_bottom;
         mm.map_trampoline();
         for (_, area) in another_mm.areas.iter() {
             mm.insert_area(

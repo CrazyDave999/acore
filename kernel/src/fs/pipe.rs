@@ -1,7 +1,7 @@
 use super::File;
 use crate::sync::UPSafeCell;
 use alloc::sync::{Arc, Weak};
-use crate::proc::switch_proc;
+use crate::proc::switch_thread;
 
 pub struct Pipe {
     readable: bool,
@@ -123,7 +123,7 @@ impl File for Pipe {
                     return read_cnt;
                 }
                 drop(ring_buffer);
-                switch_proc();
+                switch_thread();
                 continue;
             }
             if read_cnt == len {
@@ -147,7 +147,7 @@ impl File for Pipe {
             let cur_write_cnt = ring_buffer.available_write();
             if cur_write_cnt == 0 {
                 drop(ring_buffer);
-                switch_proc();
+                switch_thread();
                 continue;
             }
             if write_cnt == len {

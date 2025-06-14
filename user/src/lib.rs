@@ -233,6 +233,8 @@ bitflags! {
         const SIGSYS = 1 << 31;
     }
 }
+
+/// Send a signal to some process from current process.
 pub fn kill(pid: usize, signum: i32) -> isize {
     sys_kill(pid, signum)
 }
@@ -257,3 +259,15 @@ pub fn sigreturn() -> isize {
     sys_sigreturn()
 }
 
+pub fn thread_create(entry: usize, arg: usize) -> isize {
+    sys_thread_create(entry, arg)
+}
+
+pub fn waittid(tid: usize) -> isize {
+    loop {
+        match sys_waittid(tid) {
+            -2 => { yield_(); }
+            exit_code => return exit_code,
+        }
+    }
+}

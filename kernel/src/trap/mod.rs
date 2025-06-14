@@ -3,9 +3,8 @@ mod context;
 use crate::syscall::syscall;
 
 use crate::config::*;
-use crate::proc::{check_signals_error_of_current, current_add_signal, exit_proc, get_cur_trap_ctx, get_cur_user_token, handle_signals, switch_proc, SignalFlags};
+use crate::proc::{check_signals_error_of_current, current_add_signal, exit_thread, get_cur_trap_ctx, get_cur_user_token, handle_signals, switch_thread, SignalFlags};
 use core::arch::{asm, global_asm};
-use log::error;
 use riscv::register::{
     mtvec::TrapMode,
     scause::{self, Exception, Interrupt, Trap},
@@ -61,7 +60,7 @@ pub fn trap_handler() -> ! {
                 asm! {"csrw sip, {sip}", sip = in(reg) sip ^ 2};
             }
             set_next_trigger();
-            switch_proc();
+            switch_thread();
         }
         Trap::Exception(Exception::UserEnvCall) => {
             ctx.sepc += 4;
@@ -97,7 +96,7 @@ pub fn trap_handler() -> ! {
 
     if let Some((errno, msg)) = check_signals_error_of_current() {
         println!("[kernel] {}", msg);
-        exit_proc(errno);
+        exit_thread(errno);
     }
 
     trap_return()
@@ -107,7 +106,7 @@ pub fn trap_handler() -> ! {
 pub fn trap_return() -> ! {
     // println!("[kernel] trap_return: pid: {}", get_cur_proc().unwrap().pid.0);
     set_user_trap_entry();
-    let trap_ctx_ptr = TRAP_CONTEXT;
+    let trap_ctx_ptr = TRAP_CONTEXT_BASE;
     let user_satp = get_cur_user_token();
     // println!("satp = {:#x}", user_satp);
     extern "C" {

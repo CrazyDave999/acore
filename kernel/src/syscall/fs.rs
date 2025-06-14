@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 
 /// write buf of length `len`  to a file with `fd`
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
-    let cur_proc = get_cur_proc().unwrap();
+    let cur_proc = get_cur_proc();
     let inner = cur_proc.exclusive_access();
     let vec = inner.mm.read((buf as usize).into(), len);
     if let Some(file) = inner.get_file(fd) {
@@ -23,7 +23,7 @@ pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     }
 }
 pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
-    let cur_proc = get_cur_proc().unwrap();
+    let cur_proc = get_cur_proc();
     let inner = cur_proc.exclusive_access();
     if let Some(file) = inner.get_file(fd) {
         if !file.readable() {
@@ -44,7 +44,7 @@ pub fn sys_read(fd: usize, buf: *const u8, len: usize) -> isize {
 }
 
 pub fn sys_open(path: *const u8, flags: u32) -> isize {
-    let cur_proc = get_cur_proc().unwrap();
+    let cur_proc = get_cur_proc();
     let mut inner = cur_proc.exclusive_access();
     let path = inner.mm.read_str(VirtAddr::from(path as usize));
     // println!("sys_open: path = {}, flags = {}", path, flags);
@@ -56,13 +56,13 @@ pub fn sys_open(path: *const u8, flags: u32) -> isize {
 }
 
 pub fn sys_close(fd: usize) -> isize {
-    let cur_proc = get_cur_proc().unwrap();
+    let cur_proc = get_cur_proc();
     let mut inner = cur_proc.exclusive_access();
     inner.fd_table.dealloc_fd(fd)
 }
 
 pub fn sys_pipe(pipe: *mut usize) -> isize {
-    let cur_proc = get_cur_proc().unwrap();
+    let cur_proc = get_cur_proc();
     let mut inner = cur_proc.exclusive_access();
     let (pipe_read, pipe_write) = make_pipe_pair();
     let read_fd = inner.fd_table.insert_file(pipe_read);
@@ -78,7 +78,7 @@ pub fn sys_pipe(pipe: *mut usize) -> isize {
 }
 
 pub fn sys_dup(fd: usize) -> isize {
-    let cur_proc = get_cur_proc().unwrap();
+    let cur_proc = get_cur_proc();
     let mut inner = cur_proc.exclusive_access();
     if let Some(file) = inner.get_file(fd) {
         inner.fd_table.insert_file(file.clone())

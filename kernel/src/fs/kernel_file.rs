@@ -1,14 +1,13 @@
+use crate::drivers::BLOCK_DEVICE;
+use crate::fs::File;
+use crate::println;
+use crate::sync::UPSafeCell;
+use acore_fs::AcoreFileSystem;
+use acore_fs::{DiskInodeType, Inode, BLOCK_SIZE};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::bitflags;
 use lazy_static::lazy_static;
-use acore_fs::{DiskInodeType, Inode, BLOCK_SIZE};
-use crate::fs::File;
-use crate::sync::UPSafeCell;
-use acore_fs::AcoreFileSystem;
-use crate::console::stdout::print;
-use crate::drivers::BLOCK_DEVICE;
-use crate::println;
 
 bitflags! {
     ///Open file flags

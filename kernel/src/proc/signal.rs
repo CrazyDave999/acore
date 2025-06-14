@@ -1,6 +1,6 @@
-use bitflags::*;
 use crate::println;
-use crate::proc::{get_cur_proc, switch_proc};
+use crate::proc::{get_cur_proc, get_cur_thread, switch_thread};
+use bitflags::*;
 
 pub const MAX_SIG: usize = 31;
 
@@ -63,7 +63,7 @@ impl SignalFlags {
 }
 
 pub fn check_signals_error_of_current() -> Option<(i32, &'static str)> {
-    let cur_proc = get_cur_proc().unwrap();
+    let cur_proc = get_cur_proc();
     let inner = cur_proc.exclusive_access();
     // println!(
     //     "[K] check_signals_error_of_current {:?}",
@@ -72,7 +72,7 @@ pub fn check_signals_error_of_current() -> Option<(i32, &'static str)> {
     inner.signals.check_error()
 }
 pub fn current_add_signal(signal: SignalFlags) {
-    let cur_proc = get_cur_proc().unwrap();
+    let cur_proc = get_cur_proc();
     let mut inner = cur_proc.exclusive_access();
     inner.signals |= signal;
     // println!(
@@ -81,7 +81,7 @@ pub fn current_add_signal(signal: SignalFlags) {
     // );
 }
 fn call_kernel_signal_handler(signal: SignalFlags) {
-    let cur_proc = get_cur_proc().unwrap();
+    let cur_proc = get_cur_proc();
     let mut inner = cur_proc.exclusive_access();
 
     match signal {
@@ -96,30 +96,29 @@ fn call_kernel_signal_handler(signal: SignalFlags) {
             }
         }
         _ => {
-            // println!(
-            //     "[K] call_kernel_signal_handler:: current task sigflag {:?}",
-            //     inner.signals
-            // );
             inner.killed = true;
         }
     }
 }
 
 fn call_user_signal_handler(sig: usize, signal: SignalFlags) {
-    let cur_proc = get_cur_proc().unwrap();
-    let mut inner = cur_proc.exclusive_access();
+    let cur_thr = get_cur_thread().unwrap();
+    let cur_thr_inner = cur_thr.exclusive_access();
+    let cur_proc = cur_thr.pcb.upgrade().unwrap();
+    let mut cur_proc_inner = cur_proc.exclusive_access();
 
-    let handler = inner.signal_actions.table[sig].handler;
+    let handler = cur_proc_inner.signal_actions.table[sig].handler;
     if handler != 0 {
         // user handler
 
         // handle flag
-        inner.handling_sig = sig as isize;
-        inner.signals ^= signal;
+        cur_proc_inner.handling_sig = sig as isize;
+        cur_proc_inner.signals ^= signal;
 
-        // backup trapframe
-        let trap_ctx = inner.trap_ctx_ppn.get_mut();
-        inner.trap_ctx_backup = Some(*trap_ctx);
+        // modify trap ctx to jump to user handler
+        // backup trap ctx
+        let trap_ctx = cur_thr_inner.get_trap_ctx();
+        cur_proc_inner.trap_ctx_backup = Some(*trap_ctx);
 
         // modify trapframe
         trap_ctx.sepc = handler;
@@ -131,9 +130,11 @@ fn call_user_signal_handler(sig: usize, signal: SignalFlags) {
         println!("[K] task/call_user_signal_handler: default action: ignore it or kill process");
     }
 }
+
+/// Check signals received by current proc and handle them.
 fn check_pending_signals() {
     for sig in 0..(MAX_SIG + 1) {
-        let cur_proc = get_cur_proc().unwrap();
+        let cur_proc = get_cur_proc();
         let inner = cur_proc.exclusive_access();
         let signal = SignalFlags::from_bits(1 << sig).unwrap();
         if inner.signals.contains(signal) && (!inner.signal_mask.contains(signal)) {
@@ -141,14 +142,11 @@ fn check_pending_signals() {
             let handling_sig = inner.handling_sig;
             if handling_sig == -1 {
                 masked = false;
-            } else {
-                let handling_sig = handling_sig as usize;
-                if !inner.signal_actions.table[handling_sig]
-                    .mask
-                    .contains(signal)
-                {
-                    masked = false;
-                }
+            } else if !inner.signal_actions.table[handling_sig as usize]
+                .mask
+                .contains(signal)
+            {
+                masked = false;
             }
             if !masked {
                 drop(inner);
@@ -173,13 +171,13 @@ pub fn handle_signals() {
     loop {
         check_pending_signals();
         let (frozen, killed) = {
-            let cur_proc = get_cur_proc().unwrap();
+            let cur_proc = get_cur_proc();
             let inner = cur_proc.exclusive_access();
             (inner.frozen, inner.killed)
         };
         if !frozen || killed {
             break;
         }
-        switch_proc();
+        switch_thread();
     }
 }
