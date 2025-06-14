@@ -15,6 +15,7 @@ use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
+use crate::timer::remove_timer;
 
 pub struct ThreadManager {
     cur: Option<Arc<ThreadControlBlock>>,
@@ -172,6 +173,7 @@ pub fn exit_thread(exit_code: i32) {
             }
             let thread = thread.as_ref().unwrap();
             // if there are threads in scheduler's ready queue, we should remove them
+            remove_timer(Arc::clone(thread));
             remove_thread(Arc::clone(thread));
             let mut thr_inner = thread.exclusive_access();
             if let Some(res) = thr_inner.res.take() {
@@ -218,6 +220,7 @@ pub fn wakeup_thread(tcb: Arc<ThreadControlBlock>) {
     push_thread(tcb);
 }
 
+#[allow(unused)]
 /// Fetch a thread from the scheduler's ready queue and let it possess the cpu.
 pub fn pop_thread() -> Option<Arc<ThreadControlBlock>> {
     let mut inner = THREAD_MANAGER.exclusive_access();

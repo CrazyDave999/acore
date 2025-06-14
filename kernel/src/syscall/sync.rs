@@ -7,7 +7,7 @@ pub fn sys_sleep(ms: usize) -> isize {
     let expire_ms = get_time_ms() + ms;
     let thread = get_cur_thread().unwrap();
     create_timer(expire_ms, thread);
-    block_thread();;
+    block_thread();
     0
 }
 

@@ -419,29 +419,3 @@ lazy_static! {
     pub static ref KERNEL_MM: Arc<UPSafeCell<MemoryManager>> =
         Arc::new(unsafe { UPSafeCell::new(MemoryManager::new_kernel()) });
 }
-
-/// Get the kernel stack position of given pid
-pub fn get_kernel_stack_info(pid: usize) -> (usize, usize) {
-    let top = TRAMPOLINE - pid * (KERNEL_STACK_SIZE + PAGE_SIZE);
-    let bottom = top - KERNEL_STACK_SIZE;
-    (bottom, top)
-}
-
-/// Create framed kernel stack space for given pid
-pub fn init_kernel_stack(pid: usize) -> (usize, usize) {
-    let (bottom, top) = get_kernel_stack_info(pid);
-    KERNEL_MM.exclusive_access().insert_area(
-        bottom.into(),
-        top.into(),
-        MapType::Framed,
-        MapPerm::R | MapPerm::W,
-        None,
-    );
-    (bottom, top)
-}
-
-pub fn release_kernel_stack(pid: usize) {
-    let (bottom, _) = get_kernel_stack_info(pid);
-    KERNEL_MM.exclusive_access().remove_area(bottom.into());
-    // println!("[kernel] release_kernel_stack: pid = {}", pid);
-}

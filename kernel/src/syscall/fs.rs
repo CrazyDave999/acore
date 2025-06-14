@@ -1,6 +1,6 @@
 //! File and filesystem-related syscalls
 use crate::fs::kernel_file::{KernelFile, OpenFlags};
-use crate::fs::pipe::{make_pipe_pair, Pipe};
+use crate::fs::pipe::make_pipe_pair;
 use crate::mm::VirtAddr;
 use crate::proc::get_cur_proc;
 use alloc::vec::Vec;

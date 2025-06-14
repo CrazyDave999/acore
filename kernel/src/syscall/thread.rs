@@ -1,8 +1,7 @@
+use crate::mm::KERNEL_MM;
 use crate::proc::{get_cur_thread, push_thread, ThreadControlBlock};
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
-use crate::mm::KERNEL_MM;
-use crate::println;
 
 /// Create a new thread in the current process.
 /// entry: the entry point of the thread function

@@ -33,12 +33,12 @@ impl Path {
     pub fn new() -> Self {
         Path { path: Vec::new() }
     }
-    pub fn push(&mut self, dir: String) {
-        self.path.push(dir);
-    }
-    pub fn pop(&mut self) -> Option<String> {
-        self.path.pop()
-    }
+    // pub fn push(&mut self, dir: String) {
+    //     self.path.push(dir);
+    // }
+    // pub fn pop(&mut self) -> Option<String> {
+    //     self.path.pop()
+    // }
 }
 impl Display for Path {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

@@ -18,13 +18,10 @@ use alloc::sync::Weak;
 use alloc::vec::Vec;
 use core::cell::RefMut;
 use lazy_static::lazy_static;
-use crate::println;
 
 #[derive(Debug)]
 pub enum ProcessState {
     Ready,
-    Running,
-    // Blocked,
     Zombie,
 }
 
@@ -278,9 +275,9 @@ impl ProcessControlBlock {
             _ => false,
         }
     }
-    pub fn set_state(&self, state: ProcessState) {
-        self.inner.exclusive_access().state = state;
-    }
+    // pub fn set_state(&self, state: ProcessState) {
+    //     self.inner.exclusive_access().state = state;
+    // }
 }
 
 impl ProcessControlBlockInner {

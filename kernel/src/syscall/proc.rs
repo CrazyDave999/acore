@@ -1,13 +1,15 @@
 use crate::console::shutdown;
 use crate::fs::kernel_file::{KernelFile, OpenFlags};
 use crate::mm::{PageTable, VirtAddr};
-use crate::proc::{exit_thread, get_cur_proc, get_cur_thread, get_cur_user_token, pid2pcb, switch_thread, SignalAction, SignalFlags, MAX_SIG};
+use crate::proc::{
+    exit_thread, get_cur_proc, get_cur_thread, get_cur_user_token, pid2pcb, switch_thread,
+    SignalAction, SignalFlags, MAX_SIG,
+};
 use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use crate::println;
 
 pub fn sys_exit(exit_code: i32) -> ! {
     // println!("[kernel] sys_exit: pid: {}", sys_getpid());
@@ -117,14 +119,11 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
 pub fn sys_shutdown() -> ! {
     shutdown();
 }
-pub fn sys_kill(pid: usize, signum: i32) -> isize {
+pub fn sys_kill(pid: usize, signal: u32) -> isize {
     if let Some(pcb) = pid2pcb(pid) {
-        if let Some(flag) = SignalFlags::from_bits(1 << signum) {
+        if let Some(flag) = SignalFlags::from_bits(signal) {
             let mut inner = pcb.exclusive_access();
-            if inner.signals.contains(flag) {
-                return -1;
-            }
-            inner.signals.insert(flag);
+            inner.signals |= flag;
             0
         } else {
             -1

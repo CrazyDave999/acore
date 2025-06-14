@@ -1,8 +1,7 @@
-use alloc::collections::VecDeque;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
 use crate::proc::{block_thread, get_cur_thread, switch_thread, wakeup_thread, ThreadControlBlock};
 use crate::sync::UPSafeCell;
+use alloc::collections::VecDeque;
+use alloc::sync::Arc;
 
 pub trait Mutex: Sync + Send {
     fn lock(&self);

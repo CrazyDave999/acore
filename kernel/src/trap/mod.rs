@@ -59,6 +59,7 @@ pub fn trap_handler() -> ! {
                 asm! {"csrw sip, {sip}", sip = in(reg) sip ^ 2};
             }
             set_next_trigger();
+            check_timer();
             switch_thread();
         }
         Trap::Exception(Exception::UserEnvCall) => {
@@ -137,6 +138,6 @@ pub fn trap_from_kernel() -> ! {
     );
 }
 
-use crate::timer::set_next_trigger;
+use crate::timer::{check_timer, set_next_trigger};
 pub use context::TrapContext;
 use crate::println;
