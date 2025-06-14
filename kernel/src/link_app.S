@@ -3,7 +3,7 @@
     .section .data
     .global _num_app
 _num_app:
-    .quad 13
+    .quad 14
     .quad app_0_start
     .quad app_1_start
     .quad app_2_start
@@ -17,7 +17,8 @@ _num_app:
     .quad app_10_start
     .quad app_11_start
     .quad app_12_start
-    .quad app_12_end
+    .quad app_13_start
+    .quad app_13_end
 
     .global _app_names
 _app_names:
@@ -32,6 +33,7 @@ _app_names:
     .string "sig_simple"
     .string "sig_simple2"
     .string "sig_tests"
+    .string "sleep"
     .string "threads"
     .string "threads_arg"
 
@@ -128,7 +130,7 @@ app_10_end:
     .global app_11_end
     .align 3
 app_11_start:
-    .incbin "../user/target/riscv64gc-unknown-none-elf/release/threads"
+    .incbin "../user/target/riscv64gc-unknown-none-elf/release/sleep"
 app_11_end:
 
     .section .data
@@ -136,5 +138,13 @@ app_11_end:
     .global app_12_end
     .align 3
 app_12_start:
-    .incbin "../user/target/riscv64gc-unknown-none-elf/release/threads_arg"
+    .incbin "../user/target/riscv64gc-unknown-none-elf/release/threads"
 app_12_end:
+
+    .section .data
+    .global app_13_start
+    .global app_13_end
+    .align 3
+app_13_start:
+    .incbin "../user/target/riscv64gc-unknown-none-elf/release/threads_arg"
+app_13_end:
