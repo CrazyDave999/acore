@@ -13,7 +13,7 @@ pub struct ThreadMeta {
 // We first implement a naive RR scheduler. haha :).
 pub struct Scheduler {
     /// The queue of ready processes.
-    queue: VecDeque<ThreadMeta>,
+    pub queue: VecDeque<ThreadMeta>,
 }
 
 impl Scheduler {

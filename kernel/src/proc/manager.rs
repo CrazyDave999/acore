@@ -6,6 +6,7 @@ use crate::proc::scheduler::Scheduler;
 use crate::console::shutdown;
 use crate::println;
 use crate::proc::ctx::ThreadContext;
+use crate::proc::resource::get_trap_ctx_addr_by_tid;
 use crate::proc::switch::__switch;
 use crate::proc::thread::{ThreadControlBlock, ThreadState};
 use crate::proc::INIT_PCB;
@@ -58,18 +59,23 @@ pub fn get_cur_trap_ctx() -> &'static mut TrapContext {
     get_cur_thread().unwrap().exclusive_access().get_trap_ctx()
 }
 
+pub fn get_cur_trap_ctx_user_va() -> usize {
+    get_trap_ctx_addr_by_tid(
+        get_cur_thread()
+            .unwrap()
+            .exclusive_access()
+            .res
+            .as_ref()
+            .unwrap()
+            .tid,
+    )
+}
+
 /// Suspend current process and switch to a ready one
 pub fn switch_thread() {
-    // println!("[kernel] switch_proc: pid: {:?}", get_cur_proc().unwrap().getpid());
     let mut inner = THREAD_MANAGER.exclusive_access();
     if let Some(next_thread) = inner.scheduler.pop() {
-        // println!("1");
         if let Some(cur_thread) = inner.cur.clone() {
-            // println!(
-            //     "2 cur_pid: {:?}, next_pid: {:?}",
-            //     cur_proc.getpid(),
-            //     next_proc.getpid()
-            // );
             let mut next_inner = next_thread.exclusive_access();
             next_inner.state = ThreadState::Running;
             let next_thr_ctx: *mut ThreadContext = &mut next_inner.thread_ctx as *mut _;
@@ -83,21 +89,13 @@ pub fn switch_thread() {
             inner.cur = Some(next_thread);
             inner.scheduler.push(cur_thread);
             drop(inner);
-            // println!("going to switch, cur_proc_ctx_ptr: {:#x}, next_proc_ctx_ptr: {:#x}",
-            //          cur_proc_ctx
-            //     as usize,
-            //          next_proc_ctx as usize);
-            // unsafe {
-            //     println!("cur_proc_ctx: {:?}", cur_proc_ctx.as_ref().unwrap());
-            //     println!("next_proc_ctx: {:?}", next_proc_ctx.as_ref().unwrap());
-            // }
+
             unsafe {
                 __switch(cur_thr_ctx, next_thr_ctx);
             }
             return;
         } else {
-            // println!("3 next_pid: {:?}", next_proc.getpid());
-            // no current process, just switch to next
+            // no current thread, just switch to next
             let mut next_inner = next_thread.exclusive_access();
             next_inner.state = ThreadState::Running;
             let next_thr_ctx = &next_inner.thread_ctx as *const _;

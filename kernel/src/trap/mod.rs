@@ -3,7 +3,7 @@ mod context;
 use crate::syscall::syscall;
 
 use crate::config::*;
-use crate::proc::{check_signals_error_of_current, current_add_signal, exit_thread, get_cur_trap_ctx, get_cur_user_token, handle_signals, switch_thread, SignalFlags};
+use crate::proc::{check_signals_error_of_current, current_add_signal, exit_thread, get_cur_trap_ctx, get_cur_trap_ctx_user_va, get_cur_user_token, handle_signals, switch_thread, SignalFlags};
 use core::arch::{asm, global_asm};
 use riscv::register::{
     mtvec::TrapMode,
@@ -44,7 +44,6 @@ pub fn trap_handler() -> ! {
 
     let scause = scause::read();
     let stval = stval::read();
-    let ctx = get_cur_trap_ctx();
 
     // println!(
     //     "[kernel] trap_handler, scauce = {:?}, stval = {:#x}",
@@ -63,8 +62,12 @@ pub fn trap_handler() -> ! {
             switch_thread();
         }
         Trap::Exception(Exception::UserEnvCall) => {
+            let mut ctx = get_cur_trap_ctx();
             ctx.sepc += 4;
-            ctx.x[10] = syscall(ctx.x[17], [ctx.x[10], ctx.x[11], ctx.x[12]]) as usize;
+            let res = syscall(ctx.x[17], [ctx.x[10], ctx.x[11], ctx.x[12]]) as usize;
+            // ctx is changed during sys_exec
+            ctx = get_cur_trap_ctx();
+            ctx.x[10] = res;
         }
         Trap::Exception(Exception::StoreFault)
         | Trap::Exception(Exception::StorePageFault)
@@ -106,7 +109,7 @@ pub fn trap_handler() -> ! {
 pub fn trap_return() -> ! {
     // println!("[kernel] trap_return: pid: {}", get_cur_proc().unwrap().pid.0);
     set_user_trap_entry();
-    let trap_ctx_ptr = TRAP_CONTEXT_BASE;
+    let trap_ctx_ptr = get_cur_trap_ctx_user_va();
     let user_satp = get_cur_user_token();
     // println!("satp = {:#x}", user_satp);
     extern "C" {

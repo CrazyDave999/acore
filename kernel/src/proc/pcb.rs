@@ -91,14 +91,12 @@ impl ProcessControlBlock {
             },
         });
 
-        println!("from_elf. adding main thread");
         // create a main thread
         let thread = Arc::new(ThreadControlBlock::new(
             Arc::clone(&proc),
             proc_user_stack_bottom,
             true,
         ));
-        println!("from_elf. adding main thread ok");
 
         // set trap ctx for the main thread
         let thr_inner = thread.exclusive_access();

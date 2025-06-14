@@ -56,11 +56,11 @@ pub fn pid_alloc() -> PIDGuard {
     PIDGuard(PID_ALLOCATOR.exclusive_access().alloc())
 }
 
-fn get_trap_ctx_addr_by_tid(tid: usize) -> usize {
+pub fn get_trap_ctx_addr_by_tid(tid: usize) -> usize {
     TRAP_CONTEXT_BASE - tid * PAGE_SIZE
 }
 
-fn get_user_stack_bottom_by_tid(user_stack_base: usize, tid: usize) -> usize {
+pub fn get_user_stack_bottom_by_tid(user_stack_base: usize, tid: usize) -> usize {
     user_stack_base + tid * (PAGE_SIZE + USER_STACK_SIZE)
 }
 

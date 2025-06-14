@@ -1,6 +1,8 @@
 use crate::proc::{get_cur_thread, push_thread, ThreadControlBlock};
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
+use crate::mm::KERNEL_MM;
+use crate::println;
 
 /// Create a new thread in the current process.
 /// entry: the entry point of the thread function
@@ -40,10 +42,13 @@ pub fn sys_thread_create(entry: usize, arg: usize) -> isize {
     *new_thr_trap_ctx = TrapContext::app_init_context(
         entry,
         new_thr_res.get_user_stack_top(),
-        proc_inner.mm.page_table.token(),
+        KERNEL_MM.exclusive_access().page_table.token(),
         new_thr.kernel_stack.get_top(),
     );
     (*new_thr_trap_ctx).x[10] = arg;
+
+    // println!("sys_thread_create: new thread created with TID {}, entry: {}", new_thr_tid, entry);
+
     new_thr_tid as isize
 }
 pub fn sys_gettid() -> isize {

@@ -6,6 +6,7 @@ use crate::proc::SignalAction;
 use crate::syscall::thread::{sys_gettid, sys_thread_create, sys_waittid};
 use fs::*;
 use proc::*;
+use crate::println;
 
 const SYSCALL_DUP: usize = 24;
 const SYSCALL_OPEN: usize = 56;
