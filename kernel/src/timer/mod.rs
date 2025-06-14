@@ -1,5 +1,10 @@
 use crate::config::*;
+use crate::proc::{wakeup_thread, ThreadControlBlock};
+use crate::sync::UPSafeCell;
+use alloc::collections::BinaryHeap;
+use alloc::sync::Arc;
 use core::arch::global_asm;
+use lazy_static::lazy_static;
 use riscv::register::{mie, mscratch, mstatus, mtvec};
 
 global_asm!(include_str!("mtime_trap.S"));
@@ -12,7 +17,7 @@ const MILLI_PER_SEC: usize = 1_000;
 
 const TICKS_PER_SEC: usize = 100;
 
-pub fn set_timer(time: usize) {
+pub fn set_time_cmp(time: usize) {
     unsafe {
         (MTIMECMP as *mut usize).write_volatile(time);
     }
@@ -33,7 +38,7 @@ pub fn get_time_ms() -> usize {
 }
 
 pub fn set_next_trigger() {
-    set_timer(get_time() + 1 * CLOCK_FREQ / TICKS_PER_SEC);
+    set_time_cmp(get_time() + 1 * CLOCK_FREQ / TICKS_PER_SEC);
 }
 
 #[link_section = ".bss.stack"]
@@ -55,5 +60,67 @@ pub fn init() {
         mstatus::set_mie();
 
         mie::set_mtimer();
+    }
+}
+
+pub struct TimerCondVar {
+    pub expire_ms: usize,
+    pub tcb: Arc<ThreadControlBlock>,
+}
+
+impl PartialEq for TimerCondVar {
+    fn eq(&self, other: &Self) -> bool {
+        self.expire_ms == other.expire_ms
+    }
+}
+impl Eq for TimerCondVar {}
+impl PartialOrd for TimerCondVar {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        let a = -(self.expire_ms as isize);
+        let b = -(other.expire_ms as isize);
+        Some(a.cmp(&b))
+    }
+}
+impl Ord for TimerCondVar {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+lazy_static! {
+    static ref TIMERS: UPSafeCell<BinaryHeap<TimerCondVar>> =
+        unsafe { UPSafeCell::new(BinaryHeap::<TimerCondVar>::new()) };
+}
+
+pub fn create_timer(expire_ms: usize, tcb: Arc<ThreadControlBlock>) {
+    let mut timers = TIMERS.exclusive_access();
+    timers.push(TimerCondVar {
+        expire_ms,
+        tcb: tcb,
+    });
+}
+
+pub fn remove_timer(tcb: Arc<ThreadControlBlock>) {
+    let mut timers = TIMERS.exclusive_access();
+    let mut new_timers = BinaryHeap::<TimerCondVar>::new();
+    for condvar in timers.drain() {
+        if Arc::as_ptr(&tcb) != Arc::as_ptr(&condvar.tcb) {
+            new_timers.push(condvar);
+        }
+    }
+    timers.clear();
+    timers.append(&mut new_timers);
+}
+
+/// Wakeup threads whose timers have expired and update the TIMERS
+pub fn check_timer() {
+    let cur_ms = get_time_ms();
+    let mut timers = TIMERS.exclusive_access();
+    while let Some(timer) = timers.peek() {
+        if timer.expire_ms <= cur_ms {
+            wakeup_thread(Arc::clone(&timer.tcb));
+            timers.pop();
+        } else {
+            break;
+        }
     }
 }

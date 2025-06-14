@@ -271,3 +271,15 @@ pub fn waittid(tid: usize) -> isize {
         }
     }
 }
+pub fn spin_mutex_create() -> isize {
+    sys_mutex_create(false)
+}
+pub fn blocked_mutex_create() -> isize {
+    sys_mutex_create(true)
+}
+pub fn mutex_lock(mutex_id: usize) {
+    sys_mutex_lock(mutex_id);
+}
+pub fn mutex_unlock(mutex_id: usize) {
+    sys_mutex_unlock(mutex_id);
+}

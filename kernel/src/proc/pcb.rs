@@ -9,7 +9,7 @@ use crate::proc::manager::insert_to_pid2pcb;
 use crate::proc::resource::{pid_alloc, PIDGuard, RecycleAllocator};
 use crate::proc::thread::ThreadControlBlock;
 use crate::proc::{push_thread, SignalFlags};
-use crate::sync::UPSafeCell;
+use crate::sync::{Mutex, UPSafeCell};
 use crate::trap::TrapContext;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
@@ -58,6 +58,7 @@ pub struct ProcessControlBlockInner {
     pub threads: Vec<Option<Arc<ThreadControlBlock>>>,
     // unified allocator for thread resources
     pub thread_res_allocator: RecycleAllocator,
+    pub mutex_list: Vec<Option<Arc<dyn Mutex>>>
 }
 
 impl ProcessControlBlock {
@@ -87,6 +88,7 @@ impl ProcessControlBlock {
                     trap_ctx_backup: None,
                     threads: Vec::new(),
                     thread_res_allocator: RecycleAllocator::new(),
+                    mutex_list: Vec::new(),
                 })
             },
         });
@@ -158,6 +160,7 @@ impl ProcessControlBlock {
                     trap_ctx_backup: None,
                     threads: Vec::new(),
                     thread_res_allocator: RecycleAllocator::new(),
+                    mutex_list: Vec::new(),
                 })
             },
         });

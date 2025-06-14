@@ -115,6 +115,17 @@ pub fn switch_thread() {
     // no other ready thread, do nothing
 }
 
+/// Block current thread, and switch to a ready one.
+pub fn block_thread() {
+    let thread = get_cur_thread().unwrap();
+    let mut thr_inner = thread.exclusive_access();
+    thr_inner.state = ThreadState::Blocked;
+    drop(thr_inner);
+
+    THREAD_MANAGER.exclusive_access().cur = None;
+    switch_thread();
+}
+
 /// Exit current proc and switch to a ready one. If the current proc is init, then shutdown.
 pub fn exit_thread(exit_code: i32) {
     // println!("[kernel] exit_proc");
@@ -198,6 +209,13 @@ pub fn exit_thread(exit_code: i32) {
 pub fn push_thread(tcb: Arc<ThreadControlBlock>) {
     let mut inner = THREAD_MANAGER.exclusive_access();
     inner.scheduler.push(tcb);
+}
+
+pub fn wakeup_thread(tcb: Arc<ThreadControlBlock>) {
+    let mut thr_inner = tcb.exclusive_access();
+    thr_inner.state = ThreadState::Ready;
+    drop(thr_inner);
+    push_thread(tcb);
 }
 
 /// Fetch a thread from the scheduler's ready queue and let it possess the cpu.
