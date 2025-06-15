@@ -83,6 +83,5 @@ fn rust_init() {
 pub fn rust_main() {
     rust_init();
     info!("[kernel] Hello from kernel. This is CrazyDave's ACore implementation.\n");
-    fs::kernel_file::list_apps();
     proc::launch(proc::INIT_PCB.clone());
 }

@@ -4,6 +4,7 @@ use crate::println;
 use crate::sync::UPSafeCell;
 use acore_fs::AcoreFileSystem;
 use acore_fs::{DiskInodeType, Inode, BLOCK_SIZE};
+use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bitflags::bitflags;
@@ -39,7 +40,6 @@ impl OpenFlags {
     }
 }
 
-
 pub struct KernelFile {
     readable: bool,
     writable: bool,
@@ -74,14 +74,16 @@ impl KernelFile {
         v
     }
     pub fn from_path(path: &str, flags: OpenFlags) -> Option<Arc<Self>> {
+        // println!("from_path {:?}", path);
+        let is_dir = path.ends_with('/');
         let mut path = path.split('/').skip(1).collect::<Vec<_>>();
-
-        // println!("{:?}", path);
 
         let file_name = path.pop().unwrap();
         let mut inode = ROOT.clone();
-        for dir_entry in path {
-            inode = inode.access_dir_entry(dir_entry, DiskInodeType::Directory, false)?;
+        if path.len() > 0 {
+            for dir_entry in path[..path.len() - 1].iter() {
+                inode = inode.access_dir_entry(*dir_entry, DiskInodeType::Directory, false)?;
+            }
         }
         let (readable, writable) = flags.read_write();
         let create = if flags.contains(OpenFlags::CREATE) {
@@ -89,9 +91,28 @@ impl KernelFile {
         } else {
             false
         };
-        inode = inode.access_dir_entry(file_name, DiskInodeType::File, create)?;
-        if flags.contains(OpenFlags::TRUNC) {
-            inode.clear();
+        if is_dir && create {
+            assert!(file_name.is_empty());
+            assert!(path.len() > 0);
+            inode = inode.access_dir_entry(path[path.len() - 1], DiskInodeType::Directory, true)?;
+        } else {
+            if path.len() > 0 {
+                inode = inode.access_dir_entry(
+                    path[path.len() - 1],
+                    DiskInodeType::Directory,
+                    false,
+                )?;
+            }
+            let type_ = if is_dir {
+                assert!(file_name.is_empty());
+                DiskInodeType::Directory
+            } else {
+                DiskInodeType::File
+            };
+            inode = inode.access_dir_entry(file_name, type_, create)?;
+            if flags.contains(OpenFlags::TRUNC) {
+                inode.clear();
+            }
         }
         Some(Arc::new(Self::new(readable, writable, inode)))
     }
@@ -126,19 +147,16 @@ impl File for KernelFile {
         inner.offset = offset;
         inner.offset
     }
+
+    fn stat(&self) -> String {
+        self.inner.exclusive_access().inode.fstat()
+    }
 }
 
-lazy_static!{
+lazy_static! {
     pub static ref ROOT: Arc<Inode> = {
         let afs = AcoreFileSystem::open(BLOCK_DEVICE.clone());
         AcoreFileSystem::root_inode(afs)
     };
-}
-
-pub fn list_apps() {
-    println!("===== ROOT ======");
-    for name in ROOT.ls() {
-        println!("{}", name);
-    }
-    println!("==================");
+    pub static ref CWD: UPSafeCell<String> = unsafe { UPSafeCell::new(String::from("/")) };
 }

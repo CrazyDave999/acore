@@ -1,8 +1,9 @@
-use alloc::string::String;
 use crate::afs::AcoreFileSystem;
 use crate::block_dev::BlockDevice;
 use crate::block_manager::{get_block_cache, sync_all};
 use crate::layout::{DirEntry, DiskInode, DiskInodeType, DIR_ENTRY_SIZE};
+use alloc::format;
+use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use spin::{Mutex, MutexGuard};
@@ -59,6 +60,17 @@ impl Inode {
         let disk_inode = disk_inode_lock.as_mut_ref::<DiskInode>(self.block_offset);
 
         assert!(disk_inode.is_dir());
+
+        if name == "" {
+            // access the directory itself
+            return Some(Arc::new(Self{
+                block_id: self.block_id,
+                block_offset: self.block_offset,
+                fs: Arc::clone(&self.fs),
+                block_device: Arc::clone(&self.block_device),
+            }));
+        }
+
         let mut dir_entry = DirEntry::empty();
         let file_count = (disk_inode.size as usize) / DIR_ENTRY_SIZE;
         for i in 0..file_count {
@@ -215,5 +227,22 @@ impl Inode {
         drop(cache);
 
         sync_all()
+    }
+    pub fn fstat(&self) -> String {
+        let _fs = self.fs.lock();
+
+        let cache = get_block_cache(self.block_id, Arc::clone(&self.block_device));
+        let disk_inode_lock = cache.lock();
+        let disk_inode = disk_inode_lock.as_ref::<DiskInode>(self.block_offset);
+
+        format!(
+            "Type: {:<15} Size: {:<15} Blocks: {:<15}",
+            match disk_inode.type_ {
+                DiskInodeType::File => "File",
+                DiskInodeType::Directory => "Directory",
+            },
+            disk_inode.size,
+            DiskInode::total_blocks(disk_inode.size)
+        )
     }
 }

@@ -167,30 +167,30 @@ impl PageTable {
         }
         result
     }
-    /// find a str with start va, terminate when meet \0, but not include \0
-    pub fn find_str(&self, va: VirtAddr) -> String {
-        let mut s = String::new();
-        let mut offset = va.get_page_offset();
-        let mut cur_vpn = va.floor();
-        loop {
-            let data = self.find_ppn(cur_vpn).unwrap().get_bytes_array();
-            let mut terminated = false;
-            while offset < PAGE_SIZE {
-                if data[offset] == 0 {
-                    terminated = true;
-                    break;
-                }
-                s.push(data[offset] as char);
-                offset += 1;
-            }
-            if terminated {
-                break;
-            }
-            offset = 0;
-            cur_vpn += 1;
-        }
-        s
-    }
+    // /// find a str with start va, terminate when meet \0, but not include \0
+    // pub fn find_str(&self, va: VirtAddr) -> String {
+    //     let mut s = String::new();
+    //     let mut offset = va.get_page_offset();
+    //     let mut cur_vpn = va.floor();
+    //     loop {
+    //         let data = self.find_ppn(cur_vpn).unwrap().get_bytes_array();
+    //         let mut terminated = false;
+    //         while offset < PAGE_SIZE {
+    //             if data[offset] == 0 {
+    //                 terminated = true;
+    //                 break;
+    //             }
+    //             s.push(data[offset] as char);
+    //             offset += 1;
+    //         }
+    //         if terminated {
+    //             break;
+    //         }
+    //         offset = 0;
+    //         cur_vpn += 1;
+    //     }
+    //     s
+    // }
     #[allow(unused)]
     pub fn visualize(&self) {
         Self::visualize_dfs(self.root_ppn, 0);

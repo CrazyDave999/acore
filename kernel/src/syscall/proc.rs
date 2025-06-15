@@ -10,6 +10,7 @@ use crate::trap::TrapContext;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use crate::println;
 
 pub fn sys_exit(exit_code: i32) -> ! {
     // println!("[kernel] sys_exit: pid: {}", sys_getpid());
@@ -44,15 +45,15 @@ pub fn sys_fork() -> isize {
     new_pid as isize
 }
 pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
-    // println!("[kernel] sys_exec: pid: {}", sys_getpid());
-    let token = get_cur_user_token();
-    let page_table = PageTable::from_token(token);
-    let path = page_table.find_str((path as usize).into());
-    // println!("path: {}", path);
-
-    // fetch args in user addr space
+    // println!("[kernel] sys_exec: pid: {} path: {}", sys_getpid(), path as usize);
     let cur_proc = get_cur_proc();
     let inner = cur_proc.exclusive_access();
+
+    let path = inner.mm.read_str(VirtAddr::from(path as usize));
+
+    // println!("[kernel] sys_exec: path: {}", path);
+
+    // fetch args in user addr space
     let mut args_vec: Vec<String> = Vec::new();
     loop {
         let args_pa = inner

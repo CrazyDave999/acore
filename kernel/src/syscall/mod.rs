@@ -33,6 +33,9 @@ const SYSCALL_WAITTID: usize = 1002;
 const SYSCALL_MUTEX_CREATE: usize = 1010;
 const SYSCALL_MUTEX_LOCK: usize = 1011;
 const SYSCALL_MUTEX_UNLOCK: usize = 1012;
+const SYSCALL_FSTAT: usize = 2000;
+const SYSCALL_CD: usize = 2001;
+const SYSCALL_GETCWD: usize = 2002;
 const SYSCALL_SHUTDOWN: usize = 9999;
 
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
@@ -66,6 +69,9 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_MUTEX_CREATE => sys_mutex_create(args[0] == 1),
         SYSCALL_MUTEX_LOCK => sys_mutex_lock(args[0]),
         SYSCALL_MUTEX_UNLOCK => sys_mutex_unlock(args[0]),
+        SYSCALL_FSTAT => sys_fstat(args[0]),
+        SYSCALL_CD => sys_cd(args[0] as *const u8),
+        SYSCALL_GETCWD => sys_getcwd(args[0] as *mut u8, args[1]),
         SYSCALL_SHUTDOWN => sys_shutdown(),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }

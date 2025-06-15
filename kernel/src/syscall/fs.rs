@@ -1,8 +1,9 @@
 //! File and filesystem-related syscalls
-use crate::fs::kernel_file::{KernelFile, OpenFlags};
+use crate::fs::kernel_file::{KernelFile, OpenFlags, CWD};
 use crate::fs::pipe::make_pipe_pair;
 use crate::mm::VirtAddr;
 use crate::proc::get_cur_proc;
+use crate::{print, println};
 use alloc::vec::Vec;
 
 /// write buf of length `len`  to a file with `fd`
@@ -83,6 +84,57 @@ pub fn sys_dup(fd: usize) -> isize {
     if let Some(file) = inner.get_file(fd) {
         inner.fd_table.insert_file(file.clone())
     } else {
+        -1
+    }
+}
+
+pub fn sys_fstat(fd: usize) -> isize {
+    let cur_proc = get_cur_proc();
+    let inner = cur_proc.exclusive_access();
+    if let Some(file) = inner.get_file(fd) {
+        print!("{}", file.stat());
+        0
+    } else {
+        -1
+    }
+}
+
+/// Change current pwd. path should be an absolute path which points to a directory.
+pub fn sys_cd(path: *const u8) -> isize {
+    // read the path from the user space
+    let cur_proc = get_cur_proc();
+    let inner = cur_proc.exclusive_access();
+    let path = inner.mm.read_str(VirtAddr::from(path as usize));
+
+    if path.chars().last() != Some('/') {
+        return -1;
+    }
+
+    // check if the dir exists
+    if let Some(_) = KernelFile::from_path(path.as_str(), OpenFlags::RDONLY) {
+        // change the current working directory
+        let mut cwd = CWD.exclusive_access();
+        *cwd = path;
+        0
+    } else {
+        // directory does not exist
+        -1
+    }
+}
+
+/// Get current working directory, which is a string. The method is similar to sys_read
+pub fn sys_getcwd(buf: *const u8, len: usize) -> isize {
+    let pwd = CWD.exclusive_access();
+    let pwd_str = pwd.as_str();
+    if pwd_str.len() < len {
+        let cur_proc = get_cur_proc();
+        let inner = cur_proc.exclusive_access();
+        let mut vec = Vec::new();
+        vec.extend_from_slice(pwd_str.as_bytes());
+        inner.mm.write(VirtAddr::from(buf as usize), vec.as_slice());
+        vec.len() as isize
+    } else {
+        // buffer is not large enough
         -1
     }
 }

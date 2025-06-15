@@ -1,3 +1,4 @@
+use alloc::string::String;
 use super::File;
 use crate::sync::UPSafeCell;
 use alloc::sync::{Arc, Weak};
@@ -164,5 +165,8 @@ impl File for Pipe {
     }
     fn seek(&self, _: usize) -> usize {
         panic!("Pipe does not support seek operation");
+    }
+    fn stat(&self) -> String {
+        panic!("Pipe does not support stat operation");
     }
 }

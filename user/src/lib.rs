@@ -10,8 +10,11 @@ mod lang_items;
 mod logging;
 pub mod syscall;
 
+use alloc::format;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use bitflags::bitflags;
+use core::task::Poll::Pending;
 // use buddy_system_allocator::LockedHeap;
 use buddy::Heap;
 
@@ -34,19 +37,18 @@ pub extern "C" fn _start(argc: usize, argv: usize) -> ! {
     // recover args
     let mut v: Vec<&'static str> = Vec::new();
     for i in 0..argc {
-        let str_start = unsafe {
-            ((argv + i * core::mem::size_of::<usize>()) as *const usize).read_volatile()
-        };
-        let len = (0usize..).find(|i| unsafe {
-            ((str_start + *i) as *const u8).read_volatile() == 0
-        }).unwrap();
+        let str_start =
+            unsafe { ((argv + i * core::mem::size_of::<usize>()) as *const usize).read_volatile() };
+        let len = (0usize..)
+            .find(|i| unsafe { ((str_start + *i) as *const u8).read_volatile() == 0 })
+            .unwrap();
         v.push(
             core::str::from_utf8(unsafe {
                 core::slice::from_raw_parts(str_start as *const u8, len)
-            }).unwrap()
+            })
+            .unwrap(),
         );
     }
-
 
     exit(main(argc, v.as_slice()));
     // panic!("unreachable after sys_exit!");
@@ -263,7 +265,9 @@ pub fn thread_create(entry: usize, arg: usize) -> isize {
 pub fn waittid(tid: usize) -> isize {
     loop {
         match sys_waittid(tid) {
-            -2 => { yield_(); }
+            -2 => {
+                yield_();
+            }
             exit_code => return exit_code,
         }
     }
@@ -279,4 +283,35 @@ pub fn mutex_lock(mutex_id: usize) {
 }
 pub fn mutex_unlock(mutex_id: usize) {
     sys_mutex_unlock(mutex_id);
+}
+
+pub const MAX_NAME_LENGTH: usize = 27;
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct DirEntry {
+    pub name: [u8; MAX_NAME_LENGTH + 1],
+    pub inode_id: u32,
+}
+
+pub fn fstat(fd: usize) -> isize {
+    sys_fstat(fd)
+}
+pub fn cd(path: &str) -> isize {
+    // println!("cd {}", path);
+    sys_cd(path)
+}
+pub fn getcwd() -> String {
+    let mut buf = [0u8; 1024];
+    let len = sys_getcwd(&mut buf);
+    assert!(len >= 0, "getcwd failed with error code: {}", len);
+    let len = len as usize;
+    let str = String::from_utf8_lossy(&buf[..len]).parse().unwrap();
+    str
+}
+pub fn get_abs_path(path: &str) -> String {
+    if path.starts_with('/') {
+        path.to_string()
+    } else {
+        format!("{}{}", getcwd(), path)
+    }
 }

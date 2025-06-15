@@ -51,7 +51,7 @@ pub struct DiskInode {
     pub direct: [u32; INODE_DIRECT_CNT],
     pub indirect: [u32; MAX_INDIRECT_DEGREE],
     pub next: u32,
-    type_: DiskInodeType,
+    pub type_: DiskInodeType,
 }
 
 pub const DISK_INODE_SIZE: usize = core::mem::size_of::<DiskInode>();

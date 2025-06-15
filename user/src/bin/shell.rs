@@ -18,37 +18,11 @@ use alloc::vec::Vec;
 use core::fmt::Display;
 use log::{error, info};
 use user_lib::console::getchar;
-use user_lib::{close, dup, exec, fork, open, waitpid, OpenFlags};
+use user_lib::{close, dup, exec, fork, get_abs_path, getcwd, open, waitpid, OpenFlags};
 
 enum State {
     Good,
     Bad,
-}
-
-struct Path {
-    path: Vec<String>,
-}
-
-impl Path {
-    pub fn new() -> Self {
-        Path { path: Vec::new() }
-    }
-    // pub fn push(&mut self, dir: String) {
-    //     self.path.push(dir);
-    // }
-    // pub fn pop(&mut self) -> Option<String> {
-    //     self.path.pop()
-    // }
-}
-impl Display for Path {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut result = String::from("/");
-        for s in self.path.iter() {
-            result.push_str(s);
-            result.push('/');
-        }
-        write!(f, "{}", result)
-    }
 }
 
 impl Display for State {
@@ -60,13 +34,13 @@ impl Display for State {
     }
 }
 
-fn print_pwd(state: &State, pwd: &Path) {
+fn print_cwd(state: &State, cwd: &str) {
     match state {
         State::Good => {
-            info!("{} {}$ ", state, pwd);
+            info!("{} {}$ ", state, cwd);
         }
         State::Bad => {
-            error!("{} {}$ ", state, pwd);
+            error!("{} {}$ ", state, cwd);
         }
     }
 }
@@ -75,10 +49,10 @@ fn print_pwd(state: &State, pwd: &Path) {
 pub fn main(_argc: usize, _argv: &[&str]) -> i32 {
     println!("[shell] This is CrazyDave shell.");
     let mut line: String = String::new();
-    let pwd = Path::new();
+    let mut cwd: String = getcwd();
     let mut state = State::Good;
 
-    print_pwd(&state, &pwd);
+    print_cwd(&state, &cwd);
     loop {
         let c = getchar();
         match c {
@@ -89,14 +63,7 @@ pub fn main(_argc: usize, _argv: &[&str]) -> i32 {
                     let mut args_copy: Vec<String> = args
                         .iter()
                         .enumerate()
-                        .map(|(i, &arg)| {
-                            if i == 0 && !arg.starts_with('/') {
-                                // modify relative path to absolute path
-                                format!("{}{}\0", pwd, arg)
-                            } else {
-                                format!("{}\0", arg)
-                            }
-                        })
+                        .map(|(_, &arg)| format!("{}\0", arg))
                         .collect();
 
                     // redirect input
@@ -154,7 +121,11 @@ pub fn main(_argc: usize, _argv: &[&str]) -> i32 {
                             close(output_fd as usize);
                         }
 
-                        if exec(args_copy[0].as_str(), args_addr.as_slice()) == -1 {
+                        if exec(
+                            get_abs_path(args_copy[0].as_str()).as_str(),
+                            args_addr.as_slice(),
+                        ) == -1
+                        {
                             println!("[shell] Error when executing!");
                             return -4;
                         }
@@ -172,7 +143,8 @@ pub fn main(_argc: usize, _argv: &[&str]) -> i32 {
                     }
                     line.clear();
                 }
-                print_pwd(&state, &pwd);
+                cwd = getcwd();
+                print_cwd(&state, &cwd);
             }
             BS | DL => {
                 if !line.is_empty() {

@@ -1,6 +1,9 @@
+use alloc::string::String;
+
 pub mod kernel_file;
 pub mod stdio;
 pub mod pipe;
+
 
 pub trait File: Send + Sync {
     fn readable(&self) -> bool;
@@ -9,4 +12,6 @@ pub trait File: Send + Sync {
     fn write(&self, buf: &[u8]) -> usize;
     #[allow(unused)]
     fn seek(&self, offset: usize) -> usize;
+    #[allow(unused)]
+    fn stat(&self) -> String;
 }

@@ -70,7 +70,7 @@ impl StackFrameAllocator {
     pub fn init(&mut self, l: PhysPageNum, r: PhysPageNum) {
         self.cap = l.0;
         self.max_cap = r.0;
-        println!("last {} Physical Frames.", self.max_cap - self.cap);
+        // println!("last {} Physical Frames.", self.max_cap - self.cap);
     }
 }
 

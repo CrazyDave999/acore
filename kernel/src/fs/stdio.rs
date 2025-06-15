@@ -1,3 +1,4 @@
+use alloc::string::String;
 use super::File;
 
 
@@ -27,6 +28,10 @@ impl File for Stdin {
     fn seek(&self, _offset: usize) -> usize {
         0
     }
+
+    fn stat(&self) -> String {
+        panic!("WTF? Cannot stat stdin!");
+    }
 }
 impl File for Stdout {
     fn readable(&self) -> bool {
@@ -45,6 +50,9 @@ impl File for Stdout {
     /// do nothing
     fn seek(&self, _offset: usize) -> usize {
         0
+    }
+    fn stat(&self) -> String {
+        panic!("WTF? Cannot stat stdout!");
     }
 }
 

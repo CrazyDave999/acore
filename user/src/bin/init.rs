@@ -8,7 +8,7 @@ use user_lib::{exec, fork, wait, yield_};
 
 #[no_mangle]
 fn main() -> i32 {
-    println!("[init] This is init. I'll protect and support your user processes. Wish you a happy life!");
+    println!("\n[init] This is init. Wish you a good day!");
     if fork() == 0 {
         exec("/shell\0", &[core::ptr::null::<u8>()]);
     } else {
