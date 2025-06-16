@@ -28,6 +28,7 @@ const SYSCALL_MUTEX_UNLOCK: usize = 1012;
 const SYSCALL_FSTAT: usize = 2000;
 const SYSCALL_CD: usize = 2001;
 const SYSCALL_GETCWD: usize = 2002;
+const SYSCALL_CP: usize = 2003;
 const SYSCALL_SHUTDOWN: usize = 9999;
 
 
@@ -167,4 +168,10 @@ pub fn sys_cd(path: &str) -> isize {
 }
 pub fn sys_getcwd(buffer: &mut [u8]) -> isize {
     syscall(SYSCALL_GETCWD, [buffer.as_mut_ptr() as usize, buffer.len(), 0])
+}
+pub fn sys_cp(src: &str, dst: &str) -> isize {
+    syscall(
+        SYSCALL_CP,
+        [src.as_ptr() as usize, dst.as_ptr() as usize, 0],
+    )
 }

@@ -303,7 +303,7 @@ impl ProcessControlBlockInner {
 
 lazy_static! {
     pub static ref INIT_PCB: Arc<ProcessControlBlock> = {
-        let kernel_file = KernelFile::from_path("/init", OpenFlags::RDONLY).unwrap();
+        let kernel_file = KernelFile::from_path("/bin/init", OpenFlags::RDONLY).unwrap();
         let v = kernel_file.read_all();
         ProcessControlBlock::from_elf(v.as_slice())
     };

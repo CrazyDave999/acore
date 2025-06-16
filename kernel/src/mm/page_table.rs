@@ -3,7 +3,6 @@ use crate::config::*;
 use crate::mm::frame_allocator::{frame_alloc, FrameGuard};
 use crate::mm::{PhysAddr, VirtAddr};
 use crate::println;
-use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 use bitflags::*;
@@ -87,13 +86,13 @@ impl PageTable {
             frame_guards: vec![frame],
         }
     }
-    /// Create a temporary page table, used for fetching user space data in kernel mode
-    pub fn from_token(satp: usize) -> Self {
-        Self {
-            root_ppn: (satp & ((1usize << 44) - 1)).into(),
-            frame_guards: vec![],
-        }
-    }
+    // /// Create a temporary page table, used for fetching user space data in kernel mode
+    // pub fn from_token(satp: usize) -> Self {
+    //     Self {
+    //         root_ppn: (satp & ((1usize << 44) - 1)).into(),
+    //         frame_guards: vec![],
+    //     }
+    // }
     /// Create a virtual-physical mapping
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
         // println!("token: {:#x}, map: vpn: {:#x}, ppn: {:#x}", self.root_ppn.0, vpn.0, ppn.0);

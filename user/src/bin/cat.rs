@@ -5,7 +5,8 @@ extern crate alloc;
 #[macro_use]
 extern crate user_lib;
 
-use user_lib::{close, get_abs_path, getcwd, open, read, OpenFlags};
+use user_lib::{close, get_abs_path, open, read, OpenFlags};
+use alloc::format;
 
 #[no_mangle]
 pub fn main(argc: usize, argv: &[&str]) -> i32 {

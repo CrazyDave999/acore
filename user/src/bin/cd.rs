@@ -2,10 +2,9 @@
 #![no_main]
 
 extern crate alloc;
-#[macro_use]
 extern crate user_lib;
 
-use user_lib::{cd, get_abs_path};
+use user_lib::{cd, get_abs_path, println};
 
 #[no_mangle]
 pub fn main(argc: usize, argv: &[&str]) -> i32 {
@@ -16,6 +15,10 @@ pub fn main(argc: usize, argv: &[&str]) -> i32 {
         path.push('/');
     }
     path.push('\0');
-    cd(path.as_str());
-    0
+    if cd(path.as_str()) >=0 {
+        0
+    } else {
+        println!("[cd] Directory '{}' not found.", argv[1]);
+        -1
+    }
 }

@@ -2,7 +2,6 @@
 #![no_main]
 
 extern crate alloc;
-#[macro_use]
 extern crate user_lib;
 
 use user_lib::{close, get_abs_path, open, OpenFlags};

@@ -1,6 +1,5 @@
 use crate::drivers::BLOCK_DEVICE;
 use crate::fs::File;
-use crate::println;
 use crate::sync::UPSafeCell;
 use acore_fs::AcoreFileSystem;
 use acore_fs::{DiskInodeType, Inode, BLOCK_SIZE};

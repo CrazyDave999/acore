@@ -13,12 +13,15 @@ const DL: u8 = 0x7fu8;
 const BS: u8 = 0x08u8;
 
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Display;
 use log::{error, info};
 use user_lib::console::getchar;
-use user_lib::{close, dup, exec, fork, get_abs_path, getcwd, open, waitpid, OpenFlags};
+use user_lib::{
+    close, dup, exec, fork, get_abs_path, get_env_var_path, get_exe_path, getcwd, open, waitpid,
+    OpenFlags,
+};
 
 enum State {
     Good,
@@ -58,38 +61,42 @@ pub fn main(_argc: usize, _argv: &[&str]) -> i32 {
         match c {
             LF | CR => {
                 println!("");
+                line = line.trim().to_string();
                 if !line.is_empty() {
-                    let args: Vec<&str> = line.as_str().split(' ').collect();
-                    let mut args_copy: Vec<String> = args
-                        .iter()
-                        .enumerate()
-                        .map(|(_, &arg)| format!("{}\0", arg))
+                    let mut args: Vec<String> = line
+                        .as_str()
+                        .split_whitespace()
+                        .map(|arg| {
+                            let mut s = String::from(arg);
+                            s.push('\0');
+                            s
+                        })
                         .collect();
 
                     // redirect input
                     let mut input = String::new();
-                    if let Some((idx, _)) = args_copy
+                    if let Some((idx, _)) = args
                         .iter()
                         .enumerate()
                         .find(|(_, arg)| arg.as_str() == "<\0")
                     {
-                        input = args_copy[idx + 1].clone();
-                        args_copy.drain(idx..=idx + 1);
+                        input = args[idx + 1].clone();
+                        args.drain(idx..=idx + 1);
                     }
 
                     // redirect output
                     let mut output = String::new();
-                    if let Some((idx, _)) = args_copy
+                    if let Some((idx, _)) = args
                         .iter()
                         .enumerate()
                         .find(|(_, arg)| arg.as_str() == ">\0")
                     {
-                        output = args_copy[idx + 1].clone();
-                        args_copy.drain(idx..=idx + 1);
+                        output = args[idx + 1].clone();
+                        args.drain(idx..=idx + 1);
                     }
 
                     let mut args_addr: Vec<*const u8> =
-                        args_copy.iter().map(|arg| arg.as_ptr()).collect();
+                        args.iter().map(|arg| arg.as_ptr()).collect();
                     args_addr.push(0 as *const u8); // null-terminate the args
 
                     let pid = fork();
@@ -121,14 +128,21 @@ pub fn main(_argc: usize, _argv: &[&str]) -> i32 {
                             close(output_fd as usize);
                         }
 
-                        if exec(
-                            get_abs_path(args_copy[0].as_str()).as_str(),
-                            args_addr.as_slice(),
-                        ) == -1
-                        {
-                            println!("[shell] Error when executing!");
-                            return -4;
+                        if let Some(path) = get_exe_path(args[0].as_str()) {
+                            if exec(&path, args_addr.as_slice()) == -1 {
+                                println!("[shell] Error when executing!");
+                                return -4;
+                            }
+                        } else {
+                            println!(
+                                "[shell] Command '{}' not found. Neither in cwd nor in env var \
+                                PATHs: {:?}",
+                                args[0],
+                                get_env_var_path()
+                            );
+                            return -5;
                         }
+
                         unreachable!();
                     } else {
                         let mut exit_code: i32 = 0;

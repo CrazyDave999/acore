@@ -1,9 +1,10 @@
 //! File and filesystem-related syscalls
 use crate::fs::kernel_file::{KernelFile, OpenFlags, CWD};
 use crate::fs::pipe::make_pipe_pair;
+use crate::fs::File;
 use crate::mm::VirtAddr;
+use crate::print;
 use crate::proc::get_cur_proc;
-use crate::{print, println};
 use alloc::vec::Vec;
 
 /// write buf of length `len`  to a file with `fd`
@@ -135,6 +136,41 @@ pub fn sys_getcwd(buf: *const u8, len: usize) -> isize {
         vec.len() as isize
     } else {
         // buffer is not large enough
+        -1
+    }
+}
+
+pub fn sys_cp(src: *const u8, dst: *const u8) -> isize {
+    let cur_proc = get_cur_proc();
+    let inner = cur_proc.exclusive_access();
+
+    let src_path = inner.mm.read_str(VirtAddr::from(src as usize));
+    let dst_path = inner.mm.read_str(VirtAddr::from(dst as usize));
+
+    if src_path == dst_path {
+        // print!("cp: cannot copy '{}' to itself\n", src_path);
+        return -1;
+    }
+
+    if let Some(src_file) = KernelFile::from_path(src_path.as_str(), OpenFlags::RDONLY) {
+        if let Some(dst_file) =
+            KernelFile::from_path(dst_path.as_str(), OpenFlags::CREATE | OpenFlags::WRONLY)
+        {
+            let data = src_file.read_all();
+            let write_size = dst_file.write(data.as_slice());
+            if write_size == data.len() {
+                // Successfully copied
+                0
+            } else {
+                // print!("Error occurred when writing to destination file\n");
+                -1
+            }
+        } else {
+            // print!("Error occurred when opening destination file\n");
+            -1
+        }
+    } else {
+        // print!("Error occurred when opening source file\n");
         -1
     }
 }

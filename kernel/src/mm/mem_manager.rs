@@ -391,7 +391,10 @@ impl MemoryManager {
         let mut cur_dst_start = start_va.get_page_offset();
         let end: usize = data.len();
         loop {
-            let cur_src_end = min(cur_src_start + PAGE_SIZE, end);
+            let cur_src_end = min(
+                cur_src_start + min(PAGE_SIZE - cur_dst_start, PAGE_SIZE),
+                end
+            );
             let src = &data[cur_src_start..cur_src_end];
             let dst = &mut self
                 .page_table
@@ -400,12 +403,16 @@ impl MemoryManager {
                 .ppn()
                 .get_bytes_array()[cur_dst_start..cur_dst_start + src.len()];
             dst.copy_from_slice(src);
-            cur_src_start += PAGE_SIZE;
+            cur_src_start += src.len();
             if cur_src_start >= end {
                 break;
             }
-            cur_dst_start = 0;
-            cur_dst_vpn.0 += 1;
+            cur_dst_start += src.len();
+            if cur_dst_start >= PAGE_SIZE {
+                assert_eq!(cur_dst_start, PAGE_SIZE);
+                cur_dst_vpn.0 += 1;
+                cur_dst_start = 0;
+            }
         }
     }
     pub fn recycle_data_pages(&mut self) {

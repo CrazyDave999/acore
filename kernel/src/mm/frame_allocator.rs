@@ -1,9 +1,8 @@
 use super::addr::{PhysAddr, PhysPageNum};
 use crate::config::*;
+use crate::sync::UPSafeCell;
 use alloc::vec::Vec;
 use lazy_static::lazy_static;
-use crate::println;
-use crate::sync::UPSafeCell;
 
 #[derive(Debug)]
 /// RAII style manipulation of frame allocation

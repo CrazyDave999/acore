@@ -13,8 +13,8 @@ pub mod syscall;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+
 use bitflags::bitflags;
-use core::task::Poll::Pending;
 // use buddy_system_allocator::LockedHeap;
 use buddy::Heap;
 
@@ -300,6 +300,10 @@ pub fn cd(path: &str) -> isize {
     // println!("cd {}", path);
     sys_cd(path)
 }
+pub fn cp(src: &str, dst: &str) -> isize {
+    // println!("cp {} {}", src, dst);
+    sys_cp(src, dst)
+}
 pub fn getcwd() -> String {
     let mut buf = [0u8; 1024];
     let len = sys_getcwd(&mut buf);
@@ -313,5 +317,36 @@ pub fn get_abs_path(path: &str) -> String {
         path.to_string()
     } else {
         format!("{}{}", getcwd(), path)
+    }
+}
+
+pub fn get_env_var_path() -> Vec<String> {
+    Vec::from(["/bin/"])
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// First try in cwd, then in environment variable PATH
+pub fn get_exe_path(path: &str) -> Option<String> {
+    if path.starts_with('/') {
+        Some(path.to_string())
+    } else {
+        // try in cwd
+        let abs_path = get_abs_path(path);
+        let fd = open(&abs_path, OpenFlags::RDONLY);
+        if fd >= 0 {
+            close(fd as usize);
+            return Some(abs_path);
+        }
+        // try in environment variable PATH
+        for env_path in get_env_var_path() {
+            let fd = open(&format!("{}{}", env_path, path), OpenFlags::RDONLY);
+            if fd >= 0 {
+                close(fd as usize);
+                return Some(format!("{}{}", env_path, path));
+            }
+        }
+        None
     }
 }
