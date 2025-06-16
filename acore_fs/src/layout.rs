@@ -57,6 +57,7 @@ pub struct DiskInode {
 pub const DISK_INODE_SIZE: usize = core::mem::size_of::<DiskInode>();
 pub const DISK_INODE_PER_BLOCK: usize = BLOCK_SIZE / DISK_INODE_SIZE;
 
+#[derive(Clone, Copy)]
 pub enum DiskInodeType {
     File,
     Directory,
@@ -535,6 +536,9 @@ impl DirEntry {
     }
     pub fn inode_id(&self) -> u32 {
         self.inode_id
+    }
+    pub fn is_empty(&self) -> bool {
+        self.inode_id == 0 && self.name.iter().all(|&x| x == 0)
     }
 }
 

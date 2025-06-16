@@ -38,15 +38,24 @@ pub fn main() -> i32 {
         )
         .to_vec()
     };
-    for entry in dir_entries {
+    let mut has_unhidden = false;
+    for entry in dir_entries.iter() {
+        if entry.is_empty() {
+            continue;
+        }
         let name = unsafe {
             core::str::from_utf8_unchecked(
                 core::slice::from_raw_parts(entry.name.as_ptr(), entry.name.len()),
             )
         };
-        print!("{}  ", name);
+        if !name.starts_with(".") {
+            print!("{}  ", name);
+            has_unhidden = true;
+        }
     }
-    print!("\n");
+    if has_unhidden {
+        print!("\n");
+    }
     close(fd);
     0
 }

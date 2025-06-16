@@ -82,6 +82,6 @@ fn rust_init() {
 #[no_mangle]
 pub fn rust_main() {
     rust_init();
-    info!("[kernel] Hello from kernel. This is CrazyDave's ACore implementation.\n");
+    println!("[kernel] Hello from kernel. This is CrazyDave's ACore implementation.");
     proc::launch(proc::INIT_PCB.clone());
 }

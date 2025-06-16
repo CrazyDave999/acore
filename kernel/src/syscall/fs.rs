@@ -1,11 +1,15 @@
 //! File and filesystem-related syscalls
-use crate::fs::kernel_file::{KernelFile, OpenFlags, CWD};
+
+use alloc::string::String;
+use alloc::sync::Arc;
+use crate::fs::kernel_file::{KernelFile, OpenFlags, CWD, ROOT};
 use crate::fs::pipe::make_pipe_pair;
 use crate::fs::File;
 use crate::mm::VirtAddr;
 use crate::print;
 use crate::proc::get_cur_proc;
 use alloc::vec::Vec;
+use acore_fs::Inode;
 
 /// write buf of length `len`  to a file with `fd`
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
@@ -100,6 +104,25 @@ pub fn sys_fstat(fd: usize) -> isize {
     }
 }
 
+/// Remove redundant `.` and `..` in the path
+pub fn simplify_path(path: &str) -> String {
+    let parts: Vec<&str> = path.split('/').collect();
+    let mut simplified: Vec<&str> = Vec::new();
+
+    for part in parts {
+        if part == "." {
+            continue;
+        } else if part == ".." {
+            if simplified.len() > 1 {
+                simplified.pop();
+            }
+        } else {
+            simplified.push(part);
+        }
+    }
+    simplified.join("/")
+}
+
 /// Change current pwd. path should be an absolute path which points to a directory.
 pub fn sys_cd(path: *const u8) -> isize {
     // read the path from the user space
@@ -115,7 +138,7 @@ pub fn sys_cd(path: *const u8) -> isize {
     if let Some(_) = KernelFile::from_path(path.as_str(), OpenFlags::RDONLY) {
         // change the current working directory
         let mut cwd = CWD.exclusive_access();
-        *cwd = path;
+        *cwd = simplify_path(&path);
         0
     } else {
         // directory does not exist
@@ -173,4 +196,67 @@ pub fn sys_cp(src: *const u8, dst: *const u8) -> isize {
         // print!("Error occurred when opening source file\n");
         -1
     }
+}
+
+/// Only move the dir entry
+pub fn sys_mv(src: *const u8, dst: *const u8) -> isize {
+    let cur_proc = get_cur_proc();
+    let inner = cur_proc.exclusive_access();
+
+    let src_path = inner.mm.read_str(VirtAddr::from(src as usize));
+    let dst_path = inner.mm.read_str(VirtAddr::from(dst as usize));
+
+    if src_path == dst_path {
+        // print!("mv: cannot move '{}' to itself\n", src_path);
+        return -1;
+    }
+    let mut src_path = src_path.split('/').skip(1).collect::<Vec<_>>();
+    let mut dst_path = dst_path.split('/').skip(1).collect::<Vec<_>>();
+    let src_file_name = src_path.pop().unwrap();
+    if src_file_name.is_empty() {
+        // print!("mv: cannot move directory\n");
+        return -1;
+    }
+    let dst_file_name = {
+        let s = dst_path.pop().unwrap();
+        if s.is_empty() {
+            src_file_name
+        } else {
+            s
+        }
+    };
+    let get_dir_inode = |path: Vec<&str>| -> Option<Arc<Inode>> {
+        let mut inode = ROOT.clone();
+        for dir_entry in path.iter() {
+            inode = inode.access_dir_entry(dir_entry, acore_fs::DiskInodeType::Directory, false)?;
+        }
+        Some(inode)
+    };
+    if let Some(src_dir) = get_dir_inode(src_path) {
+        if let Some(dst_dir) = get_dir_inode(dst_path) {
+            if let Some(dst_file) = dst_dir.access_dir_entry(dst_file_name,
+                                                             acore_fs::DiskInodeType::File, false) {
+                // dst_file still exists, remove it first
+                dst_file.clear();
+                dst_dir.remove_dir_entry(dst_file_name);
+            }
+            // Move the file by changing its directory entry
+            if let Some(inode_id) = src_dir.remove_dir_entry(src_file_name) {
+                let mut fs = src_dir.fs.lock();
+                dst_dir.insert_dir_entry(dst_file_name, inode_id, &mut fs);
+            }
+            0
+        } else {
+            // print!("Error occurred when accessing destination directory\n");
+            -1
+        }
+    } else {
+        // print!("Error occurred when accessing source directory\n");
+        -1
+    }
+}
+
+/// If is a dir, only remove when it is empty.
+pub fn sys_rm(path: *const u8) -> isize {
+    0
 }

@@ -40,6 +40,9 @@ pub fn main() -> i32 {
     };
     println!("total {} entries:", dir_entries.len());
     for entry in dir_entries {
+        if entry.is_empty() {
+            continue;
+        }
         let name = unsafe {
             let raw_name = &entry.name[..];
             let len = raw_name.iter().position(|&c| c == 0).unwrap_or(raw_name.len());
@@ -51,7 +54,7 @@ pub fn main() -> i32 {
         close(fd as usize);
         print!("\n");
     }
-    print!("\n");
+    // print!("\n");
     close(dir_fd);
     0
 }

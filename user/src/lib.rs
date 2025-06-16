@@ -292,6 +292,11 @@ pub struct DirEntry {
     pub name: [u8; MAX_NAME_LENGTH + 1],
     pub inode_id: u32,
 }
+impl DirEntry {
+    pub fn is_empty(&self) -> bool {
+        self.inode_id == 0 && self.name.iter().all(|&c| c == 0)
+    }
+}
 
 pub fn fstat(fd: usize) -> isize {
     sys_fstat(fd)
@@ -304,6 +309,11 @@ pub fn cp(src: &str, dst: &str) -> isize {
     // println!("cp {} {}", src, dst);
     sys_cp(src, dst)
 }
+pub fn mv(src: &str, dst: &str) -> isize {
+    // println!("mv {} {}", src, dst);
+    sys_mv(src, dst)
+}
+
 pub fn getcwd() -> String {
     let mut buf = [0u8; 1024];
     let len = sys_getcwd(&mut buf);

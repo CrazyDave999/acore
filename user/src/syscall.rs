@@ -29,6 +29,7 @@ const SYSCALL_FSTAT: usize = 2000;
 const SYSCALL_CD: usize = 2001;
 const SYSCALL_GETCWD: usize = 2002;
 const SYSCALL_CP: usize = 2003;
+const SYSCALL_MV: usize = 2004;
 const SYSCALL_SHUTDOWN: usize = 9999;
 
 
@@ -172,6 +173,12 @@ pub fn sys_getcwd(buffer: &mut [u8]) -> isize {
 pub fn sys_cp(src: &str, dst: &str) -> isize {
     syscall(
         SYSCALL_CP,
+        [src.as_ptr() as usize, dst.as_ptr() as usize, 0],
+    )
+}
+pub fn sys_mv(src: &str, dst: &str) -> isize {
+    syscall(
+        SYSCALL_MV,
         [src.as_ptr() as usize, dst.as_ptr() as usize, 0],
     )
 }

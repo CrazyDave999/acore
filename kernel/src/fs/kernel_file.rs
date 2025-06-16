@@ -115,6 +115,8 @@ impl KernelFile {
         }
         Some(Arc::new(Self::new(readable, writable, inode)))
     }
+
+
 }
 
 impl File for KernelFile {
@@ -159,3 +161,4 @@ lazy_static! {
     };
     pub static ref CWD: UPSafeCell<String> = unsafe { UPSafeCell::new(String::from("/")) };
 }
+

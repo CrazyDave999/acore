@@ -94,11 +94,25 @@ impl AcoreFileSystem {
         drop(root_disk_inode_lock);
         drop(cache);
 
+        let afs = Arc::new(Mutex::new(afs));
+
+        // add the . and .. links for root
+        let root_inode = Inode::new(
+            0,
+            root_block_id,
+            root_block_offset,
+            Arc::clone(&afs),
+            Arc::clone(&block_device),
+        );
+        let mut fs = afs.lock();
+        root_inode.insert_dir_entry(".", 0, &mut fs);
+        root_inode.insert_dir_entry("..", 0, &mut fs);
+        drop(fs);
         // println!("Root inode initialized");
 
         sync_all();
 
-        Arc::new(Mutex::new(afs))
+        afs
     }
     pub fn open(block_device: Arc<dyn BlockDevice>) -> Arc<Mutex<Self>> {
         let cache = get_block_cache(0, Arc::clone(&block_device));
@@ -150,6 +164,7 @@ impl AcoreFileSystem {
     pub fn root_inode(afs: Arc<Mutex<Self>>) -> Arc<Inode> {
         let (block_id, block_offset) = afs.lock().get_disk_inode_pos(0);
         Arc::new(Inode::new(
+            0,
             block_id,
             block_offset,
             Arc::clone(&afs),

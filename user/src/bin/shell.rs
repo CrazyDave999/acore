@@ -12,16 +12,12 @@ const CR: u8 = 0x0du8;
 const DL: u8 = 0x7fu8;
 const BS: u8 = 0x08u8;
 
-use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Display;
 use log::{error, info};
 use user_lib::console::getchar;
-use user_lib::{
-    close, dup, exec, fork, get_abs_path, get_env_var_path, get_exe_path, getcwd, open, waitpid,
-    OpenFlags,
-};
+use user_lib::{close, dup, exec, fork, get_abs_path, get_env_var_path, get_exe_path, getcwd, open, waitpid, OpenFlags};
 
 enum State {
     Good,
@@ -102,12 +98,11 @@ pub fn main(_argc: usize, _argv: &[&str]) -> i32 {
                     let pid = fork();
                     if pid == 0 {
                         // child process
-
                         if !input.is_empty() {
                             // redirect input
-                            let input_fd = open(input.as_str(), OpenFlags::RDONLY);
+                            let input_fd = open(get_abs_path(&input).as_str(), OpenFlags::RDONLY);
                             if input_fd < 0 {
-                                println!("[shell] Error opening input file: {}", input);
+                                println!("[shell] Error opening input file: '{}'", input);
                                 return -4;
                             }
                             close(0);
@@ -118,9 +113,10 @@ pub fn main(_argc: usize, _argv: &[&str]) -> i32 {
                         if !output.is_empty() {
                             // redirect output
                             let output_fd =
-                                open(output.as_str(), OpenFlags::CREATE | OpenFlags::WRONLY);
+                                open(get_abs_path(&output).as_str(), OpenFlags::CREATE |
+                                    OpenFlags::WRONLY);
                             if output_fd < 0 {
-                                println!("[shell] Error opening output file: {}", output);
+                                println!("[shell] Error opening output file: '{}'", output);
                                 return -4;
                             }
                             close(1);
