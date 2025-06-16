@@ -110,6 +110,10 @@ sharing addr space but with independent trap context.
   - For syncronization: mutex lock/unlock, condvar wait/signal, etc.
   - For file system: open, read, write, close, pipe, and many supporting syscalls for shell implementation, like 
     fstat, getcwd, cd, mv, cp, rm, etc.
+- Thread manager
+  - Multi-threading support
+  - Thread creation, destruction, and management
+  - Thread interaction (e.g. IPC methods)
 - Scheduler
   - Trap context switching and restoring, at the granularity of threads
   - Scheduling algorithm: naive FCFS
