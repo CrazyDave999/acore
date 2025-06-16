@@ -313,6 +313,10 @@ pub fn mv(src: &str, dst: &str) -> isize {
     // println!("mv {} {}", src, dst);
     sys_mv(src, dst)
 }
+pub fn rm(path: &str) -> isize {
+    // println!("rm {}", path);
+    sys_rm(path)
+}
 
 pub fn getcwd() -> String {
     let mut buf = [0u8; 1024];
@@ -331,7 +335,7 @@ pub fn get_abs_path(path: &str) -> String {
 }
 
 pub fn get_env_var_path() -> Vec<String> {
-    Vec::from(["/bin/"])
+    Vec::from(["/bin/", "/tests/"])
         .into_iter()
         .map(|s| s.to_string())
         .collect()

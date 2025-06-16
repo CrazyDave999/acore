@@ -36,16 +36,18 @@ pub fn main() -> i32 {
             dir_data.as_ptr() as *const DirEntry,
             dir_data.len() / core::mem::size_of::<DirEntry>(),
         )
-            .to_vec()
+        .iter()
+        .filter_map(|&entry| if entry.is_empty() { None } else { Some(entry) })
+        .collect()
     };
     println!("total {} entries:", dir_entries.len());
     for entry in dir_entries {
-        if entry.is_empty() {
-            continue;
-        }
         let name = unsafe {
             let raw_name = &entry.name[..];
-            let len = raw_name.iter().position(|&c| c == 0).unwrap_or(raw_name.len());
+            let len = raw_name
+                .iter()
+                .position(|&c| c == 0)
+                .unwrap_or(raw_name.len());
             core::str::from_utf8_unchecked(&raw_name[..len])
         };
         print!("{}", format!("Name: {:<30}", name));

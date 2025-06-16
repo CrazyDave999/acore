@@ -36,17 +36,17 @@ pub fn main() -> i32 {
             dir_data.as_ptr() as *const DirEntry,
             dir_data.len() / core::mem::size_of::<DirEntry>(),
         )
-        .to_vec()
+        .iter()
+        .filter_map(|&entry| if entry.is_empty() { None } else { Some(entry) })
+        .collect()
     };
     let mut has_unhidden = false;
     for entry in dir_entries.iter() {
-        if entry.is_empty() {
-            continue;
-        }
         let name = unsafe {
-            core::str::from_utf8_unchecked(
-                core::slice::from_raw_parts(entry.name.as_ptr(), entry.name.len()),
-            )
+            core::str::from_utf8_unchecked(core::slice::from_raw_parts(
+                entry.name.as_ptr(),
+                entry.name.len(),
+            ))
         };
         if !name.starts_with(".") {
             print!("{}  ", name);

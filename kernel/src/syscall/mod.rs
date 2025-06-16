@@ -38,6 +38,7 @@ const SYSCALL_CD: usize = 2001;
 const SYSCALL_GETCWD: usize = 2002;
 const SYSCALL_CP: usize = 2003;
 const SYSCALL_MV: usize = 2004;
+const SYSCALL_RM: usize = 2005;
 const SYSCALL_SHUTDOWN: usize = 9999;
 
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
@@ -76,6 +77,7 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_GETCWD => sys_getcwd(args[0] as *mut u8, args[1]),
         SYSCALL_CP => sys_cp(args[0] as *const u8, args[1] as *const u8),
         SYSCALL_MV => sys_mv(args[0] as *const u8, args[1] as *const u8),
+        SYSCALL_RM => sys_rm(args[0] as *const u8),
         SYSCALL_SHUTDOWN => sys_shutdown(),
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }

@@ -113,7 +113,7 @@ fn acore_fs_pack() -> std::io::Result<()> {
         .unwrap();
 
     let bin_names = HashSet::from([
-        "cat", "cd", "cp", "fstat", "ll", "ls", "mkdir", "shell", "init", "exit", "mv", "echo"
+        "cat", "cd", "cp", "fstat", "ll", "ls", "mkdir", "shell", "init", "exit", "mv", "echo", "rm"
     ]);
 
     for app in apps {

@@ -155,7 +155,6 @@ impl Inode {
             let mut disk_inode_lock = cache.lock();
             let disk_inode = disk_inode_lock.as_mut_ref::<DiskInode>(self.block_offset);
 
-
             let file_count = (disk_inode.size as usize) / DIR_ENTRY_SIZE;
             let new_size = (file_count + 1) * DIR_ENTRY_SIZE;
 
@@ -177,8 +176,12 @@ impl Inode {
             None
         }
     }
-    pub fn insert_dir_entry(&self, name: &str, inode_id: u32, fs: &mut MutexGuard<AcoreFileSystem>) {
-
+    pub fn insert_dir_entry(
+        &self,
+        name: &str,
+        inode_id: u32,
+        fs: &mut MutexGuard<AcoreFileSystem>,
+    ) {
         let cache = get_block_cache(self.block_id, Arc::clone(&self.block_device));
         let mut disk_inode_lock = cache.lock();
         let disk_inode = disk_inode_lock.as_mut_ref::<DiskInode>(self.block_offset);
@@ -308,6 +311,23 @@ impl Inode {
 
         sync_all()
     }
+    pub fn can_clear(&self) -> bool {
+        let cache = get_block_cache(self.block_id, Arc::clone(&self.block_device));
+        let mut disk_inode_lock = cache.lock();
+        let disk_inode = disk_inode_lock.as_mut_ref::<DiskInode>(self.block_offset);
+        match disk_inode.type_ {
+            DiskInodeType::File => true,
+            DiskInodeType::Directory => {
+                if disk_inode.valid_dir_entry_cnt(&self.block_device) <= 2 {
+                    // only . and .. left, can clear
+                    true
+                } else {
+                    // has other files, cannot clear
+                    false
+                }
+            }
+        }
+    }
     pub fn fstat(&self) -> String {
         let _fs = self.fs.lock();
 
@@ -316,12 +336,13 @@ impl Inode {
         let disk_inode = disk_inode_lock.as_ref::<DiskInode>(self.block_offset);
 
         format!(
-            "Type: {:<15} Size: {:<15} Blocks: {:<15}",
+            "Type: {:<15} Size: {:<15} Inode: {:<15} Blocks: {:<15}",
             match disk_inode.type_ {
                 DiskInodeType::File => "File",
                 DiskInodeType::Directory => "Directory",
             },
             disk_inode.size,
+            self.inode_id,
             DiskInode::total_blocks(disk_inode.size)
         )
     }

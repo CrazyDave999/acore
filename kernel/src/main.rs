@@ -8,7 +8,6 @@ extern crate alloc;
 
 use core::arch::{asm, global_asm};
 use riscv::register::{mstatus, mepc, satp, pmpaddr0, pmpcfg0};
-use log::*;
 
 mod config;
 mod console;

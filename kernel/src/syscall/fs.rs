@@ -1,15 +1,15 @@
 //! File and filesystem-related syscalls
 
-use alloc::string::String;
-use alloc::sync::Arc;
 use crate::fs::kernel_file::{KernelFile, OpenFlags, CWD, ROOT};
 use crate::fs::pipe::make_pipe_pair;
 use crate::fs::File;
 use crate::mm::VirtAddr;
 use crate::print;
 use crate::proc::get_cur_proc;
-use alloc::vec::Vec;
 use acore_fs::Inode;
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::vec::Vec;
 
 /// write buf of length `len`  to a file with `fd`
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
@@ -198,6 +198,14 @@ pub fn sys_cp(src: *const u8, dst: *const u8) -> isize {
     }
 }
 
+pub fn get_dir_inode(path: Vec<&str>) -> Option<Arc<Inode>> {
+    let mut inode = ROOT.clone();
+    for dir_entry in path.iter() {
+        inode = inode.access_dir_entry(dir_entry, acore_fs::DiskInodeType::Directory, false)?;
+    }
+    Some(inode)
+}
+
 /// Only move the dir entry
 pub fn sys_mv(src: *const u8, dst: *const u8) -> isize {
     let cur_proc = get_cur_proc();
@@ -225,19 +233,14 @@ pub fn sys_mv(src: *const u8, dst: *const u8) -> isize {
             s
         }
     };
-    let get_dir_inode = |path: Vec<&str>| -> Option<Arc<Inode>> {
-        let mut inode = ROOT.clone();
-        for dir_entry in path.iter() {
-            inode = inode.access_dir_entry(dir_entry, acore_fs::DiskInodeType::Directory, false)?;
-        }
-        Some(inode)
-    };
+
     if let Some(src_dir) = get_dir_inode(src_path) {
         if let Some(dst_dir) = get_dir_inode(dst_path) {
-            if let Some(dst_file) = dst_dir.access_dir_entry(dst_file_name,
-                                                             acore_fs::DiskInodeType::File, false) {
+            if let Some(dst_inode) =
+                dst_dir.access_dir_entry(dst_file_name, acore_fs::DiskInodeType::File, false)
+            {
                 // dst_file still exists, remove it first
-                dst_file.clear();
+                dst_inode.clear();
                 dst_dir.remove_dir_entry(dst_file_name);
             }
             // Move the file by changing its directory entry
@@ -258,5 +261,31 @@ pub fn sys_mv(src: *const u8, dst: *const u8) -> isize {
 
 /// If is a dir, only remove when it is empty.
 pub fn sys_rm(path: *const u8) -> isize {
-    0
+    let cur_proc = get_cur_proc();
+    let inner = cur_proc.exclusive_access();
+    let path = inner.mm.read_str(VirtAddr::from(path as usize));
+    let mut path = path.split('/').skip(1).collect::<Vec<_>>();
+
+    let mut file_name = path.pop().unwrap();
+    if file_name.is_empty() && !path.is_empty() {
+        file_name = path.pop().unwrap();
+    }
+    if let Some(dir) = get_dir_inode(path) {
+        if let Some(inode) =
+            dir.access_dir_entry(file_name, acore_fs::DiskInodeType::File, false)
+        {
+            if inode.can_clear() {
+                inode.clear();
+                dir.remove_dir_entry(file_name);
+                0
+            } else {
+                -1
+            }
+        } else {
+            -1
+        }
+    } else {
+        -1
+    }
+
 }

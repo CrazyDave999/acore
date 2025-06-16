@@ -30,6 +30,7 @@ const SYSCALL_CD: usize = 2001;
 const SYSCALL_GETCWD: usize = 2002;
 const SYSCALL_CP: usize = 2003;
 const SYSCALL_MV: usize = 2004;
+const SYSCALL_RM: usize = 2005;
 const SYSCALL_SHUTDOWN: usize = 9999;
 
 
@@ -181,4 +182,7 @@ pub fn sys_mv(src: &str, dst: &str) -> isize {
         SYSCALL_MV,
         [src.as_ptr() as usize, dst.as_ptr() as usize, 0],
     )
+}
+pub fn sys_rm(path: &str) -> isize {
+    syscall(SYSCALL_RM, [path.as_ptr() as usize, 0, 0])
 }

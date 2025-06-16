@@ -339,7 +339,6 @@ impl DiskInode {
                 block_device,
             );
 
-
             cur_data_blocks = 0;
             new_data_blocks -= new_sub_tree_data_blocks;
 
@@ -470,6 +469,22 @@ impl DiskInode {
             indirect_block[i] = 0;
         }
         v
+    }
+    pub fn valid_dir_entry_cnt(&self, block_device: &Arc<dyn BlockDevice>) -> usize {
+        assert!(self.is_dir(), "Not a directory inode");
+        let mut ret = 0;
+        let mut dentry = DirEntry::empty();
+        let file_count = self.size as usize / DIR_ENTRY_SIZE;
+        for i in 0..file_count {
+            assert_eq!(
+                self.read_at(i * DIR_ENTRY_SIZE, dentry.as_bytes_mut(), block_device),
+                DIR_ENTRY_SIZE,
+            );
+            if !dentry.is_empty() {
+                ret += 1;
+            }
+        }
+        ret
     }
 }
 
