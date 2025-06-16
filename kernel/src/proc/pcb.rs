@@ -17,6 +17,7 @@ use alloc::sync::Arc;
 use alloc::sync::Weak;
 use alloc::vec::Vec;
 use core::cell::RefMut;
+use crate::sync::Condvar;
 use lazy_static::lazy_static;
 
 #[derive(Debug)]
@@ -55,7 +56,8 @@ pub struct ProcessControlBlockInner {
     pub threads: Vec<Option<Arc<ThreadControlBlock>>>,
     // unified allocator for thread resources
     pub thread_res_allocator: RecycleAllocator,
-    pub mutex_list: Vec<Option<Arc<dyn Mutex>>>
+    pub mutex_list: Vec<Option<Arc<dyn Mutex>>>,
+    pub condvar_list: Vec<Option<Arc<Condvar>>>,
 }
 
 impl ProcessControlBlock {
@@ -86,6 +88,7 @@ impl ProcessControlBlock {
                     threads: Vec::new(),
                     thread_res_allocator: RecycleAllocator::new(),
                     mutex_list: Vec::new(),
+                    condvar_list: Vec::new(),
                 })
             },
         });
@@ -158,6 +161,7 @@ impl ProcessControlBlock {
                     threads: Vec::new(),
                     thread_res_allocator: RecycleAllocator::new(),
                     mutex_list: Vec::new(),
+                    condvar_list: Vec::new(),
                 })
             },
         });

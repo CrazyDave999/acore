@@ -138,6 +138,9 @@ pub fn waitpid(pid: usize, exit_code: &mut i32) -> isize {
         }
     }
 }
+pub fn waitpid_nb(pid: usize, exit_code: &mut i32) -> isize {
+    sys_waitpid(pid as isize, exit_code as *mut _)
+}
 pub fn sleep(time_ms: usize) {
     sys_sleep(time_ms);
 }
@@ -284,6 +287,16 @@ pub fn mutex_lock(mutex_id: usize) {
 pub fn mutex_unlock(mutex_id: usize) {
     sys_mutex_unlock(mutex_id);
 }
+pub fn condvar_create() -> isize {
+    sys_condvar_create()
+}
+pub fn condvar_signal(condvar_id: usize) {
+    sys_condvar_signal(condvar_id);
+}
+pub fn condvar_wait(condvar_id: usize, mutex_id: usize) {
+    sys_condvar_wait(condvar_id, mutex_id);
+}
+
 
 pub const MAX_NAME_LENGTH: usize = 27;
 #[repr(C)]
@@ -363,4 +376,26 @@ pub fn get_exe_path(path: &str) -> Option<String> {
         }
         None
     }
+}
+#[macro_export]
+macro_rules! vstore {
+    ($var: expr, $value: expr) => {
+        // unsafe { core::intrinsics::volatile_store($var_ref as *const _ as _, $value) }
+        unsafe { core::ptr::write_volatile(core::ptr::addr_of_mut!($var), $value); }
+    };
+}
+
+#[macro_export]
+macro_rules! vload {
+    ($var: expr) => {
+        // unsafe { core::intrinsics::volatile_load($var_ref as *const _ as _) }
+        unsafe { core::ptr::read_volatile(core::ptr::addr_of!($var)) }
+    };
+}
+
+#[macro_export]
+macro_rules! memory_fence {
+    () => {
+        core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst)
+    };
 }

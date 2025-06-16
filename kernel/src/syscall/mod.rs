@@ -4,7 +4,7 @@ mod thread;
 mod sync;
 
 use crate::proc::SignalAction;
-use crate::syscall::sync::{sys_mutex_create, sys_mutex_lock, sys_mutex_unlock, sys_sleep};
+use crate::syscall::sync::{sys_condvar_create, sys_condvar_signal, sys_condvar_wait, sys_mutex_create, sys_mutex_lock, sys_mutex_unlock, sys_sleep};
 use crate::syscall::thread::{sys_gettid, sys_thread_create, sys_waittid};
 use fs::*;
 use proc::*;
@@ -33,6 +33,10 @@ const SYSCALL_WAITTID: usize = 1002;
 const SYSCALL_MUTEX_CREATE: usize = 1010;
 const SYSCALL_MUTEX_LOCK: usize = 1011;
 const SYSCALL_MUTEX_UNLOCK: usize = 1012;
+const SYSCALL_CONDVAR_CREATE: usize = 1030;
+const SYSCALL_CONDVAR_SIGNAL: usize = 1031;
+const SYSCALL_CONDVAR_WAIT: usize = 1032;
+
 const SYSCALL_FSTAT: usize = 2000;
 const SYSCALL_CD: usize = 2001;
 const SYSCALL_GETCWD: usize = 2002;
@@ -72,6 +76,9 @@ pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
         SYSCALL_MUTEX_CREATE => sys_mutex_create(args[0] == 1),
         SYSCALL_MUTEX_LOCK => sys_mutex_lock(args[0]),
         SYSCALL_MUTEX_UNLOCK => sys_mutex_unlock(args[0]),
+        SYSCALL_CONDVAR_CREATE => sys_condvar_create(),
+        SYSCALL_CONDVAR_SIGNAL => sys_condvar_signal(args[0]),
+        SYSCALL_CONDVAR_WAIT => sys_condvar_wait(args[0], args[1]),
         SYSCALL_FSTAT => sys_fstat(args[0]),
         SYSCALL_CD => sys_cd(args[0] as *const u8),
         SYSCALL_GETCWD => sys_getcwd(args[0] as *mut u8, args[1]),

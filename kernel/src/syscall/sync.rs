@@ -1,7 +1,7 @@
-use alloc::sync::Arc;
 use crate::proc::{block_thread, get_cur_proc, get_cur_thread};
-use crate::sync::{BlockedMutex, Mutex, SpinMutex};
+use crate::sync::{BlockedMutex, Condvar, Mutex, SpinMutex};
 use crate::timer::{create_timer, get_time_ms};
+use alloc::sync::Arc;
 
 pub fn sys_sleep(ms: usize) -> isize {
     let expire_ms = get_time_ms() + ms;
@@ -51,5 +51,45 @@ pub fn sys_mutex_unlock(mid: usize) -> isize {
     drop(proc_inner);
     drop(proc);
     mutex.unlock();
+    0
+}
+
+pub fn sys_condvar_create() -> isize {
+    let proc = get_cur_proc();
+    let mut proc_inner = proc.exclusive_access();
+    let cid = if let Some(cid) = proc_inner
+        .condvar_list
+        .iter()
+        .enumerate()
+        .find(|(_, item)| item.is_none())
+        .map(|(id, _)| id)
+    {
+        proc_inner.condvar_list[cid] = Some(Arc::new(Condvar::new()));
+        cid
+    } else {
+        proc_inner.condvar_list.push(Some(Arc::new(Condvar::new())));
+        proc_inner.condvar_list.len() - 1
+    };
+    cid as isize
+}
+
+pub fn sys_condvar_signal(condvar_id: usize) -> isize {
+    let proc = get_cur_proc();
+    let proc_inner = proc.exclusive_access();
+    let condvar = Arc::clone(proc_inner.condvar_list[condvar_id].as_ref().unwrap());
+    drop(proc_inner);
+    drop(proc);
+    condvar.signal();
+    0
+}
+
+pub fn sys_condvar_wait(condvar_id: usize, mutex_id: usize) -> isize {
+    let proc = get_cur_proc();
+    let proc_inner = proc.exclusive_access();
+    let condvar = Arc::clone(proc_inner.condvar_list[condvar_id].as_ref().unwrap());
+    let mutex = Arc::clone(proc_inner.mutex_list[mutex_id].as_ref().unwrap());
+    drop(proc_inner);
+    drop(proc);
+    condvar.wait(mutex);
     0
 }

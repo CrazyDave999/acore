@@ -82,13 +82,16 @@ pub fn switch_thread() {
             let next_thr_ctx: *mut ThreadContext = &mut next_inner.thread_ctx as *mut _;
 
             let mut cur_inner = cur_thread.exclusive_access();
-            cur_inner.state = ThreadState::Ready;
+            if cur_inner.state!= ThreadState::Blocked {
+                cur_inner.state = ThreadState::Ready;
+                inner.scheduler.push(cur_thread.clone());
+            }
             let cur_thr_ctx: *mut ThreadContext = &mut cur_inner.thread_ctx as *mut _;
 
             drop(next_inner);
             drop(cur_inner);
             inner.cur = Some(next_thread);
-            inner.scheduler.push(cur_thread);
+
             drop(inner);
 
             unsafe {
@@ -123,7 +126,7 @@ pub fn block_thread() {
     thr_inner.state = ThreadState::Blocked;
     drop(thr_inner);
 
-    THREAD_MANAGER.exclusive_access().cur = None;
+    // THREAD_MANAGER.exclusive_access().cur = None;
     switch_thread();
 }
 

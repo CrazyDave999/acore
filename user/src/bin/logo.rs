@@ -1,6 +1,67 @@
-# ACORE implementation
+#![no_std]
+#![no_main]
 
-```
+extern crate alloc;
+extern crate user_lib;
+
+use alloc::string::ToString;
+use alloc::vec::Vec;
+use user_lib::print;
+/// 打印 logo，每行使用一条 HSV 渐变色（仅用 core）
+pub fn print_colored_logo(logo_str: &str) {
+    let lines: Vec<&str> = logo_str.lines().collect();
+    let total_lines = lines.len().max(1);
+
+    for (i, line) in lines.iter().enumerate() {
+        let t = i as f32 / total_lines as f32;
+
+        let hue = if t < 0.6 {
+            0.9 - t * 0.2
+        } else {
+            0.55 - (t - 0.6) * 0.4
+        };
+
+        let hue = hue % 1.0;
+
+        let (r, g, b) = hsv_to_rgb_no_std(hue, 1.0, 1.0);
+        print_color_line(line, r, g, b);
+    }
+}
+
+/// 输出带颜色的一整行
+fn print_color_line(line: &str, r: u8, g: u8, b: u8) {
+    // ANSI true color 24-bit 转义序列
+    print!("\x1b[38;2;{};{};{}m{}\x1b[0m\n", r, g, b, line);
+}
+
+/// 无std实现的 floor，转换 HSV 到 RGB，兼容 no_std
+fn hsv_to_rgb_no_std(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
+    let h6 = h * 6.0;
+    let i = h6 as i32; // 代替 floor()
+    let f = h6 - (i as f32);
+
+    let p = v * (1.0 - s);
+    let q = v * (1.0 - f * s);
+    let t = v * (1.0 - (1.0 - f) * s);
+
+    let (r, g, b) = match i % 6 {
+        0 => (v, t, p),
+        1 => (q, v, p),
+        2 => (p, v, t),
+        3 => (p, q, v),
+        4 => (t, p, v),
+        5 | _ => (v, p, q),
+    };
+
+    (
+        (r * 255.0) as u8,
+        (g * 255.0) as u8,
+        (b * 255.0) as u8,
+    )
+}
+#[no_mangle]
+pub fn main(_argc: usize, _argv: &[&str]) -> i32 {
+    let logo_str = r"
           _____                    _____                   _______                   _____                    _____
          /\    \                  /\    \                 /::\    \                 /\    \                  /\    \
         /::\    \                /::\    \               /::::\    \               /::\    \                /::\    \
@@ -23,6 +84,7 @@
         \::/    /                \::/    /                 ~~                      \:|   |                  \::/    /
          \/____/                  \/____/                                           \|___|                   \/____/
 
-
-```
-
+".to_string();
+    print_colored_logo(&logo_str);
+    0
+}

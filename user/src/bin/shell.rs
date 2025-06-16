@@ -47,6 +47,17 @@ fn print_cwd(state: &State, cwd: &str) {
 #[no_mangle]
 pub fn main(_argc: usize, _argv: &[&str]) -> i32 {
     println!("[shell] This is CrazyDave shell.");
+
+    // print the logo, run the logo exe file
+    let pid = fork();
+    if pid == 0 {
+        exec("/bin/logo\0", &[core::ptr::null::<u8>()]);
+    } else {
+        waitpid(pid as usize, &mut 0);
+    }
+
+
+
     let mut line: String = String::new();
     let mut cwd: String = getcwd();
     let mut state = State::Good;
@@ -144,7 +155,7 @@ pub fn main(_argc: usize, _argv: &[&str]) -> i32 {
                         let mut exit_code: i32 = 0;
                         let exit_pid = waitpid(pid as usize, &mut exit_code);
                         assert_eq!(pid, exit_pid);
-                        println!("[shell] Process {} exited with code {}", pid, exit_code);
+                        // println!("[shell] Process {} exited with code {}", pid, exit_code);
                         if exit_code < 0 {
                             state = State::Bad;
                         } else {

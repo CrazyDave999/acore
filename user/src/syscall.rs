@@ -25,6 +25,10 @@ const SYSCALL_WAITTID: usize = 1002;
 const SYSCALL_MUTEX_CREATE: usize = 1010;
 const SYSCALL_MUTEX_LOCK: usize = 1011;
 const SYSCALL_MUTEX_UNLOCK: usize = 1012;
+const SYSCALL_CONDVAR_CREATE: usize = 1030;
+const SYSCALL_CONDVAR_SIGNAL: usize = 1031;
+const SYSCALL_CONDVAR_WAIT: usize = 1032;
+
 const SYSCALL_FSTAT: usize = 2000;
 const SYSCALL_CD: usize = 2001;
 const SYSCALL_GETCWD: usize = 2002;
@@ -162,6 +166,18 @@ pub fn sys_mutex_lock(id: usize) -> isize {
 pub fn sys_mutex_unlock(id: usize) -> isize {
     syscall(SYSCALL_MUTEX_UNLOCK, [id, 0, 0])
 }
+pub fn sys_condvar_create() -> isize {
+    syscall(SYSCALL_CONDVAR_CREATE, [0, 0, 0])
+}
+
+pub fn sys_condvar_signal(condvar_id: usize) -> isize {
+    syscall(SYSCALL_CONDVAR_SIGNAL, [condvar_id, 0, 0])
+}
+
+pub fn sys_condvar_wait(condvar_id: usize, mutex_id: usize) -> isize {
+    syscall(SYSCALL_CONDVAR_WAIT, [condvar_id, mutex_id, 0])
+}
+
 pub fn sys_fstat(fd: usize) -> isize {
     syscall(SYSCALL_FSTAT, [fd, 0, 0])
 }
