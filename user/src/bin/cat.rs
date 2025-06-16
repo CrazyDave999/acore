@@ -23,7 +23,14 @@ pub fn main(argc: usize, argv: &[&str]) -> i32 {
         if size == 0 {
             break;
         }
-        print!("{}", core::str::from_utf8(&buf[..size]).unwrap());
+        match core::str::from_utf8(&buf[..size]) {
+            Ok(str) => {
+                print!("{}", str);
+            }
+            Err(_) => {
+                panic!("Error parsing read data as UTF-8");
+            }
+        }
     }
     close(fd);
     0

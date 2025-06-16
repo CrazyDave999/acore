@@ -10,7 +10,7 @@ use user_lib::{get_abs_path, println, rm};
 pub fn main(_argc: usize, argv: &[&str]) -> i32 {
     for arg in argv.iter().skip(1) {
         if rm(get_abs_path(*arg).as_str()) < 0 {
-            println!("[rm] '{}' doesn't exist or is a non-empty directory", argv[1]);
+            println!("[rm] '{}' doesn't exist or is a non-empty directory", *arg);
             return -1;
         }
     }
