@@ -131,6 +131,7 @@ sharing addr space but with independent trap context.
   - Trap context switching and restoring, at the granularity of threads
   - Scheduling algorithm: naive FCFS
   - Timer interrupt
+  - Blocking and waiting mechanism
 
 ### Synchronization primitives
 - Mutex(both Spin and Blocked)
