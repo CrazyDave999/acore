@@ -111,6 +111,12 @@ fn acore_fs_pack() -> std::io::Result<()> {
     let tests_inode = root_inode
         .access_dir_entry("tests", acore_fs::DiskInodeType::Directory, true)
         .unwrap();
+    let _tmp_inode = root_inode
+        .access_dir_entry("tmp", acore_fs::DiskInodeType::Directory, true)
+        .unwrap();
+    let _usr_inode = root_inode
+        .access_dir_entry("usr", acore_fs::DiskInodeType::Directory, true)
+        .unwrap();
 
     let bin_names = HashSet::from([
         "cat", "cd", "cp", "fstat", "ll", "ls", "mkdir", "shell", "init", "exit", "mv", "echo",

@@ -7,12 +7,21 @@ extern crate alloc;
 
 use alloc::format;
 use alloc::vec::Vec;
-use user_lib::{close, getcwd, open, read, DirEntry, OpenFlags};
+use user_lib::{close, get_abs_path, getcwd, open, read, DirEntry, OpenFlags};
 
 #[no_mangle]
-pub fn main() -> i32 {
-    let cwd = getcwd();
-    let fd = open(format!("{}\0", cwd).as_str(), OpenFlags::RDONLY);
+pub fn main(argc: usize, argv: &[&str]) -> i32 {
+    assert!(argc <= 2, "Usage: ls [path]");
+    let path = if argc == 1 {
+        getcwd()
+    } else {
+        let mut s = get_abs_path(argv[1]);
+        if !s.ends_with('/') {
+            s.push('/');
+        }
+        s
+    };
+    let fd = open(format!("{}\0", &path).as_str(), OpenFlags::RDONLY);
     if fd == -1 {
         panic!("Error occured when opening file");
     }

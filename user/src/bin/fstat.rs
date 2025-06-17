@@ -2,17 +2,16 @@
 #![no_main]
 
 extern crate alloc;
-
 extern crate user_lib;
 
 use alloc::format;
-use user_lib::{fstat, open, print, OpenFlags};
+use user_lib::{fstat, get_abs_path, open, print, OpenFlags};
 
 #[no_mangle]
 pub fn main(argc: usize, argv: &[&str]) -> i32 {
-    let pwd= "/";
-    assert!(argc == 2);
-    let fd = open(format!("{}{}", pwd, argv[1]).as_str(), OpenFlags::RDONLY);
+    assert_eq!(argc, 2);
+    let path = get_abs_path(argv[1]);
+    let fd = open(format!("{}\0", path).as_str(), OpenFlags::RDONLY);
     if fd == -1 {
         panic!("Error occured when opening file");
     }

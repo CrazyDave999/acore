@@ -62,7 +62,9 @@ impl Inode {
         let mut disk_inode_lock = cache.lock();
         let disk_inode = disk_inode_lock.as_mut_ref::<DiskInode>(self.block_offset);
 
-        assert!(disk_inode.is_dir());
+        if !disk_inode.is_dir() {
+            return None;
+        }
 
         if name == "" {
             // access the directory itself
