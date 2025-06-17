@@ -104,6 +104,18 @@ sharing addr space but with independent trap context.
 - Process Loading (from disk with the help of AcoreFS)
   - ELF parsing
   - Sections loading (ref to page table)
+- PCB design
+  - Pid & State
+  - Children and parent pointers
+  - Memory manager
+  - File descriptor table
+  - Threads
+  - Mutexes & Condvars
+- TCB design
+  - Tid & State
+  - Unified resources
+  - Trap context
+  - Thread context
 - Syscall
   - For process: fork, exec, exit, wait, yield, getpid, signal actions, etc.
   - For thread: create, gettid, waittid, etc.
@@ -113,6 +125,7 @@ sharing addr space but with independent trap context.
 - Thread manager
   - Multi-threading support
   - Thread creation, destruction, and management
+  - Unified thread resources management
   - Thread interaction (e.g. IPC methods)
 - Scheduler
   - Trap context switching and restoring, at the granularity of threads
@@ -138,3 +151,4 @@ sharing addr space but with independent trap context.
   - Environment variable PATH
   - Built-in commands: cat, ls, ll, fstat, cd, touch, mkdir, cp, mv, rm, echo, etc.
 - Some DIY features
+- Tests for major components
